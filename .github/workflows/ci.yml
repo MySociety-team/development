@@ -3,11 +3,11 @@ name: Continuous Integration
 on:
   pull_request:
     branches:
-      - develop
+      - development
 
   push:
     branches:
-      - develop
+      - development
 
   workflow_dispatch:
 
