@@ -1,0 +1,74 @@
+name: Bug report
+description: Report reproducible incorrect behavior
+title: "fix: "
+labels:
+  - bug
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug description
+      description: Explain what is going wrong.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Log in as...
+        2. Open...
+        3. Submit...
+        4. Observe...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+
+  - type: dropdown
+    id: environment
+    attributes:
+      label: Environment
+      options:
+        - Local
+        - Staging
+        - Production
+    validations:
+      required: true
+
+  - type: input
+    id: browser
+    attributes:
+      label: Browser or runtime
+      placeholder: Chrome 140, Node.js 24, or not applicable
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Logs or screenshots
+      description: Remove passwords, tokens and personal information before posting.
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      options:
+        - Minor
+        - Moderate
+        - Major
+        - Critical
+    validations:
+      required: true
