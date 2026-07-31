@@ -1,0 +1,36 @@
+# Replace every placeholder with an actual GitHub username.
+
+# Default ownership
+* @ritiky2005 @mahabriarman
+
+# Client application
+/client/ @ritiky2005 @mahabriarman
+
+# Server application
+/server/ @ritiky2005 @mahabriarman
+
+# Database and domain models
+/server/src/models/ @ritiky2005 @mahabriarman
+
+
+# Authentication and authorization
+/server/src/modules/auth/ @ritiky2005 @mahabriarman
+
+/server/src/middleware/ @ritiky2005 @mahabriarman
+
+
+# Payment code always requires technical-lead review
+/server/src/modules/payments/ @ritiky2005 @mahabriarman
+
+
+# Repository governance and automation
+/.github/ @ritiky2005 @mahabriarman
+
+/eslint.config.js @ritiky2005 @mahabriarman
+
+/.prettierrc.json @ritiky2005 @mahabriarman
+
+/package.json @ritiky2005 @mahabriarman
+
+/package-lock.json @ritiky2005 @mahabriarman
+
