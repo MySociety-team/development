@@ -43,7 +43,7 @@ function App() {
       <section className="card">
         <p className="eyebrow">MySociety</p>
 
-        <h1>Society Management Platform</h1>
+        <h1 className="bg-red-600 text-xl font-bold">Society Management Platform</h1>
 
         <p>The React client and Express server have been scaffolded successfully.</p>
 

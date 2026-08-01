@@ -36,6 +36,7 @@
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
+    "@tailwindcss/vite": "^4.3.3",
     "concurrently": "^10.0.4",
     "eslint": "10.8.0",
     "eslint-config-prettier": "10.1.8",
@@ -44,6 +45,7 @@
     "globals": "17.8.0",
     "husky": "9.1.7",
     "lint-staged": "17.2.0",
-    "prettier": "3.9.6"
+    "prettier": "3.9.6",
+    "tailwindcss": "^4.3.3"
   }
 }
