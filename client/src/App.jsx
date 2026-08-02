@@ -42,15 +42,11 @@ function App() {
     <main className="app">
       <section className="card">
         <p className="eyebrow">MySociety</p>
-
+        hello there this is a new task
         <h1 className="bg-red-600 text-xl font-bold">Society Management Platform</h1>
-
         <p>The React client and Express server have been scaffolded successfully.</p>
-
         {apiStatus.loading && <p>Checking backend connection...</p>}
-
         {apiStatus.message && <p className="success">Backend status: {apiStatus.message}</p>}
-
         {apiStatus.error && <p className="error">Backend connection failed: {apiStatus.error}</p>}
       </section>
     </main>
