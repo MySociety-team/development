@@ -1,16 +1,21 @@
-export function errorHandler(error, request, response, _next) {
-  console.error(error);
+const errorHandler = (err, req, res, _next) => {
+  const statusCode = err.statusCode || 500;
 
-  const statusCode = error.statusCode || 500;
-
-  response.status(statusCode).json({
+  const response = {
     success: false,
-    error: {
-      code: error.code || "INTERNAL_SERVER_ERROR",
-      message:
-        process.env.NODE_ENV === "production"
-          ? "An unexpected server error occurred"
-          : error.message
-    }
-  });
-}
+    code: err.code || "INTERNAL_SERVER_ERROR",
+    message: err.message || "Internal server error"
+  };
+
+  if (err.details) {
+    response.details = err.details;
+  }
+
+  if (process.env.NODE_ENV === "development") {
+    response.stack = err.stack;
+  }
+
+  res.status(statusCode).json(response);
+};
+
+export default errorHandler;
