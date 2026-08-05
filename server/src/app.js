@@ -5,9 +5,10 @@ import express from "express";
 import helmet from "helmet";
 import morgan from "morgan";
 
-import { errorHandler } from "./middleware/errorHandler.js";
+import errorHandler from "./middleware/errorHandler.js";
 import { notFound } from "./middleware/notFound.js";
 import apiRouter from "./routes/index.js";
+import authRoutes from "./modules/auth/auth.routes.js";
 
 const app = express();
 
@@ -32,6 +33,7 @@ if (process.env.NODE_ENV !== "test") {
 }
 
 app.use("/api/v1", apiRouter);
+app.use("/api/v1/auth", authRoutes);
 
 app.use(notFound);
 app.use(errorHandler);
