@@ -23,7 +23,7 @@ const userSchema = new Schema(
     password: {
       type: String,
       required: [true, "Password is Required"],
-      minlength: [8, "Password must be at least 8 characters"],
+      minlength: [4, "Password must be at least 4 characters"],
       select: false
     },
 
@@ -38,12 +38,6 @@ const userSchema = new Schema(
       trim: true,
       default:
         "https://static.vecteezy.com/system/resources/thumbnails/020/937/370/small/user-icon-for-your-website-design-logo-app-ui-free-vector.jpg"
-    },
-
-    role: {
-      type: String,
-      enum: ["user", "resident", "secretary"],
-      default: "user"
     }
   },
   {
