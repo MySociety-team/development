@@ -1,6 +1,6 @@
 import User from "../models/User.js";
 import ApiError from "../utils/apiError.js";
-import asyncHandler from "./asyncHandler.js";
+import asyncHandler from "../utils/asyncHandler.js";
 import { verifyJwt } from "../utils/jwt.js";
 
 const extractBearerToken = (authorizationHeader) => {

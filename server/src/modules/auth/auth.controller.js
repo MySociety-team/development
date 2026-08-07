@@ -1,6 +1,6 @@
 import User from "../../models/User.js";
 import ApiError from "../../utils/apiError.js";
-import asyncHandler from "../../middleware/asyncHandler.js";
+import asyncHandler from "../../utils/asyncHandler.js";
 import { generateJwt } from "../../utils/jwt.js";
 
 export const register = asyncHandler(async (req, res) => {
