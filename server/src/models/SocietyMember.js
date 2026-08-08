@@ -61,10 +61,7 @@ const societyMemberSchema = new Schema(
 );
 
 // Prevent the same user from joining the same society twice
-societyMemberSchema.index(
-  { societyId: 1, userId: 1 },
-  { unique: true }
-);
+societyMemberSchema.index({ societyId: 1, userId: 1 }, { unique: true });
 
 // Find members of a flat based on society and status
 societyMemberSchema.index({
@@ -73,9 +70,6 @@ societyMemberSchema.index({
   status: 1
 });
 
-const SocietyMember = mongoose.model(
-  "SocietyMember",
-  societyMemberSchema
-);
+const SocietyMember = mongoose.model("SocietyMember", societyMemberSchema);
 
 export default SocietyMember;

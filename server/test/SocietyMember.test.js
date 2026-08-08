@@ -34,10 +34,7 @@ test("rejects an invalid society role", async () => {
     mobileNumber: "9876543210"
   });
 
-  await assert.rejects(
-    () => member.validate(),
-    /Role must be SECRETARY or RESIDENT/
-  );
+  await assert.rejects(() => member.validate(), /Role must be SECRETARY or RESIDENT/);
 });
 
 test("rejects an invalid member type", async () => {
@@ -97,10 +94,7 @@ test("allows one user to belong to multiple societies", async () => {
 
   assert.equal(firstMembership.userId.toString(), userId.toString());
   assert.equal(secondMembership.userId.toString(), userId.toString());
-  assert.notEqual(
-    firstMembership.societyId.toString(),
-    secondMembership.societyId.toString()
-  );
+  assert.notEqual(firstMembership.societyId.toString(), secondMembership.societyId.toString());
 });
 
 test("allows multiple members in the same flat", async () => {
