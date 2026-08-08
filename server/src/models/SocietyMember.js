@@ -53,11 +53,6 @@ const societyMemberSchema = new Schema(
       enum: ["ACTIVE", "INACTIVE"],
       default: "ACTIVE",
       required: true
-    },
-
-    joinedAt: {
-      type: Date,
-      default: Date.now
     }
   },
   {
