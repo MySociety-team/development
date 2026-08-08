@@ -40,8 +40,8 @@ const flatSchema = new Schema(
     flatType: {
       type: String,
       required: [true, "Flat type is required"],
-      trim: true
-      // enum:[],
+      trim: true,
+      enum: ["1RK", "1BHK", "2BHK", "3BHK", "4BHK", "5BHK"]
     }
   },
   {
