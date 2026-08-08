@@ -40,3 +40,12 @@ Clone the repository:
 git clone <development-repository-url>
 cd mysociety-development
 ```
+
+## Api Routes
+
+Auth Routes
+
+- POST `VITE_BASE_API_URL/api/v1/auth/register` register a new user
+- POST `VITE_BASE_API_URL/api/v1/auth/login` login an existing user
+- POST `VITE_BASE_API_URL/api/v1/auth/logout` logout a logged in user
+- GET `VITE_BASE_API_URL/api/v1/auth/me` get current logged in user information
