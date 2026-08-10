@@ -1,59 +1,51 @@
-import { useEffect, useState } from "react";
-import "./App.css";
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api/v1";
+import useAuth from "./modules/auth/hooks/useAuth.js";
 
 function App() {
-  const [apiStatus, setApiStatus] = useState({
-    loading: true,
-    message: "",
-    error: ""
-  });
+  const {
+    user,
+    token,
+    loading,
+    isAuthenticated,
+  } = useAuth();
 
-  useEffect(() => {
-    async function checkApiHealth() {
-      try {
-        const response = await fetch(`${API_BASE_URL}/health`);
 
-        if (!response.ok) {
-          throw new Error(`API returned status ${response.status}`);
-        }
-
-        const result = await response.json();
-
-        setApiStatus({
-          loading: false,
-          message: result.message,
-          error: ""
-        });
-      } catch (error) {
-        setApiStatus({
-          loading: false,
-          message: "",
-          error: error.message
-        });
-      }
-    }
-
-    checkApiHealth();
-  }, []);
+  if (loading) {
+    return <h1>Auth is loading...</h1>;
+  }
 
   return (
-    <main className="app">
-      <section className="card">
-        <p className="eyebrow">MySociety</p>
+    <div style={{ padding: "30px", fontFamily: "Arial" }}>
+      <h1>MySociety Auth Test</h1>
 
-        <h1 className="bg-red-600 text-xl font-bold">Society Management Platform</h1>
+      <hr />
 
-        <p>The React client and Express server have been scaffolded successfully.</p>
+      <p>
+        <strong>AuthProvider:</strong> ✅ Working
+      </p>
 
-        {apiStatus.loading && <p>Checking backend connection...</p>}
+      <p>
+        <strong>useAuth:</strong> ✅ Working
+      </p>
 
-        {apiStatus.message && <p className="success">Backend status: {apiStatus.message}</p>}
+      <p>
+        <strong>Loading:</strong> {loading ? "true" : "false"}
+      </p>
 
-        {apiStatus.error && <p className="error">Backend connection failed: {apiStatus.error}</p>}
-      </section>
-    </main>
+      <p>
+        <strong>Authenticated:</strong>{" "}
+        {isAuthenticated ? "true" : "false"}
+      </p>
+
+      <p>
+        <strong>Token:</strong>{" "}
+        {token ? token : "No token stored"}
+      </p>
+
+      <p>
+        <strong>User:</strong>{" "}
+        {user ? JSON.stringify(user) : "No user loaded"}
+      </p>
+    </div>
   );
 }
 
