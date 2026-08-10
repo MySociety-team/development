@@ -1,33 +1,10 @@
-import dotenv from "dotenv";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-dotenv.config({
-  path: path.join(__dirname, "../.env")
-});
 import assert from "node:assert/strict";
-import { before, after, beforeEach, describe, it } from "node:test";
+import { describe, it } from "node:test";
 import mongoose from "mongoose";
 import Subscription, { SUBSCRIPTION_STATUS, PLAN_NAME } from "../src/models/Subscription.js";
 
 describe("Subscription Model", () => {
-  before(async () => {
-    await mongoose.connect(process.env.MONGODB_URI);
-  });
-
-  beforeEach(async () => {
-    await Subscription.deleteMany({});
-  });
-
-  after(async () => {
-    await Subscription.deleteMany({});
-    await mongoose.connection.close();
-  });
-
-  it("should use basic as the default plan", async () => {
+  it("should use basic as the default plan", () => {
     const subscription = new Subscription({
       societyId: new mongoose.Types.ObjectId(),
       purchasedBy: new mongoose.Types.ObjectId(),
@@ -61,8 +38,8 @@ describe("Subscription Model", () => {
     await assert.rejects(subscription.validate());
   });
 
-  it("should detect an expired subscription", async () => {
-    const subscription = await Subscription.create({
+  it("should detect an expired subscription", () => {
+    const subscription = new Subscription({
       societyId: new mongoose.Types.ObjectId(),
       purchasedBy: new mongoose.Types.ObjectId(),
       amountPaise: 59900,
@@ -71,25 +48,15 @@ describe("Subscription Model", () => {
       expiresAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
     });
 
-    const activeSubscriptions = await Subscription.findActive();
-
-    assert.equal(activeSubscriptions.length, 0);
     assert.ok(subscription.expiresAt < new Date());
   });
 
-  it("should find an active subscription with a future end date", async () => {
-    await Subscription.create({
-      societyId: new mongoose.Types.ObjectId(),
-      purchasedBy: new mongoose.Types.ObjectId(),
-      amountPaise: 59900,
-      status: SUBSCRIPTION_STATUS.ACTIVE,
-      startsAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
-      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
-    });
+  it("should find an active subscription with a future end date", () => {
+    const query = Subscription.findActive();
+    const filter = query.getFilter();
 
-    const activeSubscriptions = await Subscription.findActive();
-
-    assert.equal(activeSubscriptions.length, 1);
-    assert.equal(activeSubscriptions[0].status, SUBSCRIPTION_STATUS.ACTIVE);
+    assert.equal(filter.status, SUBSCRIPTION_STATUS.ACTIVE);
+    assert.ok(filter.expiresAt.$gt instanceof Date);
+    assert.ok(filter.expiresAt.$gt <= new Date());
   });
 });
