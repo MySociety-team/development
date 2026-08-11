@@ -20,7 +20,7 @@ const subscriptionSchema = new Schema(
     societyId: {
       type: Schema.Types.ObjectId,
       ref: "Society",
-      required: [true, "Society is Required"]
+      default: null
     },
 
     purchasedBy: {
@@ -81,14 +81,38 @@ subscriptionSchema.pre("validate", function (next) {
   next();
 });
 
-subscriptionSchema.statics.findActive = function () {
-  return this.find({
+subscriptionSchema.statics.findActiveForUser = function (userId, options = {}) {
+  const { plan, unassignedOnly = false } = options;
+
+  const query = {
+    purchasedBy: userId,
     status: SUBSCRIPTION_STATUS.ACTIVE,
+    startsAt: { $lte: new Date() },
     expiresAt: { $gt: new Date() }
-  });
+  };
+
+  if (plan) {
+    query.plan = plan;
+  }
+
+  if (unassignedOnly) {
+    query.societyId = null;
+  }
+
+  return this.findOne(query);
 };
 
-// TODO: Remove development-only subscription bypass before final presentation.
+subscriptionSchema.index({
+  purchasedBy: 1,
+  plan: 1,
+  status: 1,
+  expiresAt: 1
+});
+
+subscriptionSchema.index({
+  societyId: 1
+});
+
 const Subscription = mongoose.model("Subscription", subscriptionSchema);
 
 export { SUBSCRIPTION_STATUS, PLAN_NAME };
