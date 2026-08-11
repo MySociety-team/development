@@ -5,7 +5,6 @@ import { generateJwt } from "../../utils/jwt.js";
 
 export const register = asyncHandler(async (req, res) => {
   const { name, email, password, mobileNumber = null } = req.body;
-
   const normalizedEmail = email.trim().toLowerCase();
 
   const existingUser = await User.exists({
