@@ -1,4 +1,4 @@
-import { createBrowserRouter, Navigate, Outlet } from "react-router";
+import { createBrowserRouter, Navigate } from "react-router";
 
 import LoginPage from "../modules/auth/pages/LoginPage.jsx";
 import RegisterPage from "../modules/auth/pages/RegisterPage.jsx";
@@ -9,10 +9,7 @@ import RouteErrorPage from "../pages/RouteErrorPage.jsx";
 // Replace this with the real Societies page
 // once that module exists.
 import SocietiesPage from "../modules/societies/pages/SocietiesPage.jsx";
-
-function RootRoute() {
-  return <Outlet />;
-}
+import RootRoute from "../components/common/RootRoute.jsx";
 
 const router = createBrowserRouter([
   {
