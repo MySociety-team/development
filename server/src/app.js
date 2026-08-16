@@ -9,7 +9,7 @@ import errorHandler from "./middleware/errorHandler.js";
 import { notFound } from "./middleware/notFound.js";
 import apiRouter from "./routes/index.js";
 import authRoutes from "./modules/auth/auth.routes.js";
-
+import societyRoutes from "./modules/societies/society.routes.js";
 const app = express();
 
 app.disable("x-powered-by");
@@ -34,6 +34,7 @@ if (process.env.NODE_ENV !== "test") {
 
 app.use("/api/v1", apiRouter);
 app.use("/api/v1/auth", authRoutes);
+app.use("/api/v1/societies", societyRoutes);
 
 app.use(notFound);
 app.use(errorHandler);
