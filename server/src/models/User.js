@@ -1,9 +1,8 @@
-import mongoose from "mongoose";
 import bcrypt from "bcrypt";
+import mongoose from "mongoose";
 
 const { Schema } = mongoose;
 
-// Schema
 const userSchema = new Schema(
   {
     name: {
@@ -29,8 +28,8 @@ const userSchema = new Schema(
 
     mobileNumber: {
       type: String,
-      required: [true, "Moblie Number  is Required"],
-      trim: true
+      trim: true,
+      default: null
     },
 
     avatarUrl: {
@@ -45,7 +44,6 @@ const userSchema = new Schema(
   }
 );
 
-//==============middleware - Run before saving===============
 userSchema.pre("save", async function (next) {
   if (!this.isModified("password")) {
     return next();
@@ -60,20 +58,13 @@ userSchema.pre("save", async function (next) {
   }
 });
 
-//===========compare Enter password with hash password from database===============
-
 userSchema.methods.comparePassword = async function (candidatePassword) {
   return bcrypt.compare(candidatePassword, this.password);
 };
 
-//===========serialization convert document into json===================
-
 userSchema.methods.toJSON = function () {
-  //convert mongoose documnet into normal js object
   const user = this.toObject();
-  // remove password from user
   delete user.password;
-  // return safe user without password ;
   return user;
 };
 

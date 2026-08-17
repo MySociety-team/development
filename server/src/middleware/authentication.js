@@ -41,7 +41,7 @@ const authenticate = asyncHandler(async (req, res, next) => {
   }
 
   const user = await User.findById(payload.sub)
-    .select("_id name email role memberType status")
+    .select("_id name email mobileNumber avatarUrl")
     .lean();
 
   if (!user) {
