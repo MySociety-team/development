@@ -19,7 +19,7 @@ const flatSchema = new Schema(
       required: [true, "Floor is required"],
       validate: {
         validator: Number.isInteger,
-        message: "Floor must be a integer"
+        message: "Floor must be an integer"
       }
     },
     wing: {
@@ -36,13 +36,19 @@ const flatSchema = new Schema(
       type: Boolean,
       default: false
     },
-    // TODO: Replace enum values after team confirms approved flat types.
     flatType: {
       type: String,
       required: [true, "Flat type is required"],
       trim: true,
       enum: ["1RK", "1BHK", "2BHK", "3BHK", "4BHK", "5BHK"]
-    }
+    },
+    invitedEmails: [
+      {
+        type: String,
+        trim: true,
+        lowercase: true
+      }
+    ]
   },
   {
     timestamps: true
