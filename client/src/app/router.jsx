@@ -16,6 +16,12 @@ import CreateContactPage from "../modules/contacts/pages/CreateContactPage.jsx";
 
 import SubscriptionPage from "../modules/subscriptions/pages/SubscriptionPage.jsx";
 
+import MeetingsPage from "../modules/meetings/pages/MeetingsPage.jsx";
+import CreateMeetingPage from "../modules/meetings/pages/CreateMeetingPage.jsx";
+import MeetingDetailsPage from "../modules/meetings/pages/MeetingDetailsPage.jsx";
+import EditMeetingPage from "../modules/meetings/pages/EditMeetingPage.jsx";
+import MeetingAttendancePage from "../modules/meetings/pages/MeetingAttendancePage.jsx";
+
 import NotFoundPage from "../pages/NotFoundPage.jsx";
 import RouteErrorPage from "../pages/RouteErrorPage.jsx";
 
@@ -26,6 +32,7 @@ const router = createBrowserRouter([
   {
     element: <RootRoute />,
     errorElement: <RouteErrorPage />,
+
     children: [
       {
         path: "/",
@@ -87,6 +94,31 @@ const router = createBrowserRouter([
           {
             path: "/societies/:societyId/contacts/create",
             element: <CreateContactPage />
+          },
+
+          {
+            path: "/societies/:societyId/meetings",
+            element: <MeetingsPage />
+          },
+
+          {
+            path: "/societies/:societyId/meetings/create",
+            element: <CreateMeetingPage />
+          },
+
+          {
+            path: "/societies/:societyId/meetings/:meetingId",
+            element: <MeetingDetailsPage />
+          },
+
+          {
+            path: "/societies/:societyId/meetings/:meetingId/edit",
+            element: <EditMeetingPage />
+          },
+
+          {
+            path: "/societies/:societyId/meetings/:meetingId/attendance",
+            element: <MeetingAttendancePage />
           }
         ]
       },

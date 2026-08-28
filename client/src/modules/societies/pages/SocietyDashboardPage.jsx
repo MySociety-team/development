@@ -317,6 +317,35 @@ function SocietyDashboardPage() {
             </div>
           </section>
 
+          {/* Meetings */}
+          <Link
+            to={`/societies/${society.id}/meetings`}
+            className="group flex h-full flex-col rounded-3xl border border-slate-200 bg-white p-7 shadow-[0_14px_45px_-28px_rgba(15,23,42,0.3)] transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_18px_50px_-25px_rgba(15,23,42,0.35)]"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">
+                  Society
+                </p>
+
+                <h2 className="mt-2 text-lg font-bold text-slate-950">Meetings</h2>
+              </div>
+
+              <span className="text-xl text-slate-400 transition-transform duration-200 group-hover:translate-x-1 group-hover:text-slate-900">
+                →
+              </span>
+            </div>
+
+            <p className="mt-3 text-sm leading-6 text-slate-500">
+              View upcoming and previous society meetings.
+            </p>
+
+            <div className="mt-auto pt-6 text-sm font-semibold text-slate-900">
+              View meetings
+              <span className="ml-1 transition-transform group-hover:translate-x-1">→</span>
+            </div>
+          </Link>
+
           {/* Society members */}
           <Link
             to={`/societies/${society.id}/members`}
