@@ -25,6 +25,11 @@ export const validateCreateMeeting = (data) => {
     throw new ApiError(400, "MEETING_DATETIME_INVALID", "Meeting date and time is invalid");
   }
 
+  // Do not allow creating a meeting in the past
+  if (new Date(dateTime) <= new Date()) {
+    throw new ApiError(400, "MEETING_DATETIME_PAST", "Meeting date and time must be in the future");
+  }
+
   if (!venue || typeof venue !== "string" || !venue.trim()) {
     throw new ApiError(400, "MEETING_VENUE_REQUIRED", "Meeting venue is required");
   }
@@ -78,6 +83,14 @@ export const validateUpdateMeeting = (data) => {
   if (data.dateTime !== undefined) {
     if (Number.isNaN(new Date(data.dateTime).getTime())) {
       throw new ApiError(400, "MEETING_DATETIME_INVALID", "Meeting date and time is invalid");
+    }
+
+    if (new Date(data.dateTime) <= new Date()) {
+      throw new ApiError(
+        400,
+        "MEETING_DATETIME_PAST",
+        "Meeting date and time must be in the future"
+      );
     }
   }
 

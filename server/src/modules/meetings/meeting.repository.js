@@ -8,6 +8,12 @@ export const findMeetingById = async (meetingId, societyId) => {
   return Meeting.findOne({
     _id: meetingId,
     societyId
+  }).populate({
+    path: "attendance.societyMemberId",
+    populate: {
+      path: "userId",
+      select: "name email"
+    }
   });
 };
 
@@ -51,5 +57,11 @@ export const updateMeetingAttendance = async (meetingId, societyId, attendance) 
       new: true,
       runValidators: true
     }
-  );
+  ).populate({
+    path: "attendance.societyMemberId",
+    populate: {
+      path: "userId",
+      select: "name email"
+    }
+  });
 };
