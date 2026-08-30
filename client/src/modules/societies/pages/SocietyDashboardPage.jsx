@@ -11,6 +11,7 @@ function SocietyDashboardPage() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -39,6 +40,19 @@ function SocietyDashboardPage() {
       cancelled = true;
     };
   }, [societyId]);
+
+  const handleCopyCode = async () => {
+    if (!data?.society?.joiningCode) {
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(data.society.joiningCode);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error("Failed to copy joining code: ", err);
+    }
+  };
 
   if (loading) {
     return (
@@ -189,12 +203,53 @@ function SocietyDashboardPage() {
                   Joining code
                 </p>
 
-                <p className="mt-3 font-mono text-3xl font-bold tracking-[0.22em] text-slate-950 sm:text-4xl">
-                  {society.joiningCode}
-                </p>
+                <div className="mt-3 flex items-center justify-center gap-3">
+                  <p className="font-mono text-3xl font-bold tracking-[0.22em] text-slate-950 sm:text-4xl pl-4">
+                    {society.joiningCode}
+                  </p>
 
-                <p className="mt-3 text-xs text-slate-500">
-                  Residents can use this code from the Join Society page.
+                  <button
+                    type="button"
+                    onClick={handleCopyCode}
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 hover:text-slate-900 shadow-sm hover:shadow transition cursor-pointer"
+                    title="Copy Joining Code"
+                  >
+                    {copied ? (
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-4.5 w-4.5 text-emerald-600"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2.5}
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                    ) : (
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-4.5 w-4.5"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 002-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"
+                        />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+
+                <p className="mt-4 text-xs text-slate-500">
+                  {copied ? (
+                    <span className="font-semibold text-emerald-600">Copied to clipboard!</span>
+                  ) : (
+                    "Residents can use this code from the Join Society page."
+                  )}
                 </p>
               </div>
             </div>
@@ -342,6 +397,65 @@ function SocietyDashboardPage() {
 
             <div className="mt-auto pt-6 text-sm font-semibold text-slate-900">
               View members
+              <span className="ml-1 transition-transform group-hover:translate-x-1">→</span>
+            </div>
+          </Link>
+
+          {/* Complaints helpdesk */}
+          <Link
+            to={`/societies/${society.id}/complaints`}
+            className="group flex h-full flex-col rounded-3xl border border-slate-200 bg-white p-7 shadow-[0_14px_45px_-28px_rgba(15,23,42,0.3)] transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_18px_50px_-25px_rgba(15,23,42,0.35)]"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">
+                  Helpdesk
+                </p>
+
+                <h2 className="mt-2 text-lg font-bold text-slate-950">Complaints helpdesk</h2>
+              </div>
+
+              <span className="text-xl text-slate-400 transition-transform duration-200 group-hover:translate-x-1 group-hover:text-slate-900">
+                →
+              </span>
+            </div>
+
+            <p className="mt-3 text-sm leading-6 text-slate-500">
+              Lodge, view, and manage complaints or maintenance issues in your society.
+            </p>
+
+            <div className="mt-auto pt-6 text-sm font-semibold text-slate-900">
+              Go to complaints
+              <span className="ml-1 transition-transform group-hover:translate-x-1">→</span>
+            </div>
+          </Link>
+
+          {/* Society contacts */}
+          <Link
+            to={`/societies/${society.id}/contacts`}
+            className="group flex h-full flex-col rounded-3xl border border-slate-200 bg-white p-7 shadow-[0_14px_45px_-28px_rgba(15,23,42,0.3)] transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_18px_50px_-25px_rgba(15,23,42,0.35)]"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">
+                  Directory
+                </p>
+
+                <h2 className="mt-2 text-lg font-bold text-slate-950">Society contacts</h2>
+              </div>
+
+              <span className="text-xl text-slate-400 transition-transform duration-200 group-hover:translate-x-1 group-hover:text-slate-900">
+                →
+              </span>
+            </div>
+
+            <p className="mt-3 text-sm leading-6 text-slate-500">
+              Find contact numbers of emergency services, security, maintenance, and committee
+              members.
+            </p>
+
+            <div className="mt-auto pt-6 text-sm font-semibold text-slate-900">
+              View contacts
               <span className="ml-1 transition-transform group-hover:translate-x-1">→</span>
             </div>
           </Link>
