@@ -5,6 +5,7 @@ import AppShell from "../../../components/common/AppShell.jsx";
 import { getApiErrorCode, getApiErrorMessage } from "../../../lib/apiError.js";
 import { useAuth } from "../../auth/hooks/useAuth.js";
 import { joinSociety, verifySocietyCode } from "../api/society.api.js";
+import { parseFlatInput } from "../utils/flatParser.js";
 
 const FLAT_TYPES = ["1RK", "1BHK", "2BHK", "3BHK", "4BHK", "5BHK"];
 const MEMBER_TYPES = ["OWNER", "TENANT", "FAMILY_MEMBER"];
@@ -78,10 +79,21 @@ function JoinSocietyPage() {
   const handleChange = (event) => {
     const { name, value } = event.target;
 
-    setForm((current) => ({
-      ...current,
-      [name]: value
-    }));
+    if (name === "flatNumber") {
+      const parsed = parseFlatInput(value);
+      setForm((current) => ({
+        ...current,
+        flatNumber: value,
+        wing: parsed.wing !== null ? parsed.wing : current.wing,
+        floor: parsed.floor !== null ? parsed.floor : current.floor,
+        addressNote: parsed.addressNote !== null ? parsed.addressNote : current.addressNote
+      }));
+    } else {
+      setForm((current) => ({
+        ...current,
+        [name]: value
+      }));
+    }
 
     setErrorMessage("");
   };
@@ -373,9 +385,12 @@ function JoinSocietyPage() {
                     value={form.flatNumber}
                     onChange={handleChange}
                     disabled={!isVerified}
-                    placeholder="B-204"
+                    placeholder="A-101"
                     className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-sm text-slate-900 outline-none transition-all placeholder:text-slate-400 hover:border-slate-300 focus:border-slate-950 focus:bg-white focus:ring-4 focus:ring-slate-950/5 disabled:cursor-not-allowed disabled:bg-slate-100"
                   />
+                  <p className="mt-1.5 text-[11px] text-slate-400">
+                    Auto-detects wing and floor (e.g. A-101)
+                  </p>
                 </div>
 
                 <div>

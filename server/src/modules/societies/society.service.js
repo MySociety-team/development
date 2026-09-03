@@ -13,6 +13,7 @@ import {
   validateJoiningCodePayload,
   validateJoinSocietyPayload
 } from "./society.validation.js";
+import { createBulkNotifications } from "../notifications/notification.service.js";
 
 export const checkSocietyCreationSubscription = async ({ userId, session = null }) => {
   const enforcementEnabled = process.env.SOCIETY_SUBSCRIPTION_ENFORCEMENT !== "false";
@@ -470,6 +471,56 @@ export const joinSociety = async ({ user, societyId, payload }) => {
     throw error;
   } finally {
     await session.endSession();
+  }
+
+  // Notify all society members (both secretary and residents) about new resident
+  try {
+    const activeMembers = await SocietyMember.find({
+      societyId,
+      status: "ACTIVE"
+    }).select("userId role");
+
+    if (activeMembers.length > 0) {
+      const flatLabel = result.flat
+        ? ` (Flat ${result.flat.wing || ""}-${result.flat.flatNumber || ""})`
+        : "";
+
+      const notifications = activeMembers.map((member) => {
+        const isJoiningUser = member.userId.toString() === user.id.toString();
+
+        if (isJoiningUser) {
+          return {
+            recipientId: member.userId,
+            societyId,
+            type: "MEMBER_JOINED",
+            title: `Welcome to ${result.society.name}`,
+            message: `You have successfully joined as ${result.membership.memberType}${flatLabel}.`,
+            link: `/societies/${societyId}/dashboard`,
+            metadata: {
+              memberId: result.membership._id,
+              userId: user.id
+            }
+          };
+        }
+
+        return {
+          recipientId: member.userId,
+          societyId,
+          type: "MEMBER_JOINED",
+          title: "New Resident Joined",
+          message: `${user.name || "A new resident"}${flatLabel} joined as ${result.membership.memberType}.`,
+          link: `/societies/${societyId}/members`,
+          metadata: {
+            memberId: result.membership._id,
+            userId: user.id
+          }
+        };
+      });
+
+      await createBulkNotifications(notifications);
+    }
+  } catch (notificationErr) {
+    console.error("Failed to notify members of new member:", notificationErr);
   }
 
   return {

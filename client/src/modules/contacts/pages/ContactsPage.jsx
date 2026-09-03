@@ -3,12 +3,14 @@ import { Link, useParams } from "react-router";
 
 import AppShell from "../../../components/common/AppShell.jsx";
 import { getApiErrorMessage } from "../../../lib/apiError.js";
+import { getSociety } from "../../societies/api/society.api.js";
 import { getContacts } from "../api/contact.api.js";
 
 function ContactPage() {
   const { societyId } = useParams();
 
   const [contacts, setContacts] = useState([]);
+  const [userRole, setUserRole] = useState(null);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
@@ -16,12 +18,16 @@ function ContactPage() {
   useEffect(() => {
     let cancelled = false;
 
-    const loadContacts = async () => {
+    const loadData = async () => {
       try {
-        const data = await getContacts(societyId, search);
+        const [contactsData, societyData] = await Promise.all([
+          getContacts(societyId, search),
+          getSociety(societyId)
+        ]);
 
         if (!cancelled) {
-          setContacts(data.contacts ?? []);
+          setContacts(contactsData.contacts ?? []);
+          setUserRole(societyData?.membership?.role || null);
         }
       } catch (error) {
         if (!cancelled) {
@@ -34,18 +40,21 @@ function ContactPage() {
       }
     };
 
-    loadContacts();
+    loadData();
 
     return () => {
       cancelled = true;
     };
   }, [societyId, search]);
 
+  const isSecretary = userRole === "SECRETARY";
+
   return (
     <AppShell
       title="Society Contacts"
       description="Find electricians, plumbers, cleaners and other service providers."
       backTo={`/societies/${societyId}/dashboard`}
+      societyId={societyId}
     >
       <div className="space-y-6">
         {/* Top section */}
@@ -58,12 +67,14 @@ function ContactPage() {
             className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm outline-none focus:border-slate-500"
           />
 
-          <Link
-            to={`/societies/${societyId}/contacts/create`}
-            className="rounded-lg bg-slate-900 px-4 py-2 text-center text-sm font-semibold text-white hover:bg-slate-700"
-          >
-            + Add Contact
-          </Link>
+          {isSecretary && (
+            <Link
+              to={`/societies/${societyId}/contacts/create`}
+              className="rounded-lg bg-slate-900 px-4 py-2 text-center text-sm font-semibold text-white hover:bg-slate-700 transition"
+            >
+              + Add Contact
+            </Link>
+          )}
         </div>
 
         {/* Error */}
