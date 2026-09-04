@@ -14,6 +14,8 @@ import SocietyMembersPage from "../modules/societies/pages/SocietyMembersPage.js
 import ContactsPage from "../modules/contacts/pages/ContactsPage.jsx";
 import CreateContactPage from "../modules/contacts/pages/CreateContactPage.jsx";
 
+import ComplaintsPage from "../modules/complaints/pages/ComplaintsPage.jsx";
+
 import SubscriptionPage from "../modules/subscriptions/pages/SubscriptionPage.jsx";
 
 import MeetingsPage from "../modules/meetings/pages/MeetingsPage.jsx";
@@ -119,6 +121,10 @@ const router = createBrowserRouter([
           {
             path: "/societies/:societyId/meetings/:meetingId/attendance",
             element: <MeetingAttendancePage />
+          },
+          {
+            path: "/societies/:societyId/complaints",
+            element: <ComplaintsPage />
           }
         ]
       },
