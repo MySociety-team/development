@@ -14,6 +14,7 @@ import societyRoutes from "./modules/societies/society.routes.js";
 import subscriptionRoutes from "./modules/subscriptions/subscription.routes.js";
 import meetingRoutes from "./modules/meetings/meeting.routes.js";
 import complaintRoutes from "./modules/complaints/complaint.routes.js";
+import announcementRoutes from "./modules/announcements/announcement.routes.js";
 
 import apiRouter from "./routes/index.js";
 
@@ -54,6 +55,8 @@ app.use("/api/v1/societies", complaintRoutes);
 app.use("/api/v1/subscriptions", subscriptionRoutes);
 
 app.use("/api/v1/meetings", meetingRoutes);
+
+app.use("/api/v1/societies", announcementRoutes);
 
 app.use(notFound);
 

@@ -11,7 +11,7 @@ export const validateMeetingId = (meetingId) => {
 };
 
 export const validateCreateMeeting = (data) => {
-  const { title, description, dateTime, venue, duration, topics } = data;
+  const { title, description, summary, dateTime, venue, duration, topics } = data;
 
   if (!title || typeof title !== "string" || !title.trim()) {
     throw new ApiError(400, "MEETING_TITLE_REQUIRED", "Meeting title is required");
@@ -19,6 +19,10 @@ export const validateCreateMeeting = (data) => {
 
   if (description !== undefined && typeof description !== "string") {
     throw new ApiError(400, "MEETING_DESCRIPTION_INVALID", "Meeting description must be a string");
+  }
+
+  if (summary !== undefined && typeof summary !== "string") {
+    throw new ApiError(400, "MEETING_SUMMARY_INVALID", "Meeting summary must be a string");
   }
 
   if (!dateTime || Number.isNaN(new Date(dateTime).getTime())) {
@@ -77,6 +81,12 @@ export const validateUpdateMeeting = (data) => {
         "MEETING_DESCRIPTION_INVALID",
         "Meeting description must be a string"
       );
+    }
+  }
+
+  if (data.summary !== undefined) {
+    if (typeof data.summary !== "string") {
+      throw new ApiError(400, "MEETING_SUMMARY_INVALID", "Meeting summary must be a string");
     }
   }
 
