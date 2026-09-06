@@ -24,6 +24,11 @@ import MeetingDetailsPage from "../modules/meetings/pages/MeetingDetailsPage.jsx
 import EditMeetingPage from "../modules/meetings/pages/EditMeetingPage.jsx";
 import MeetingAttendancePage from "../modules/meetings/pages/MeetingAttendancePage.jsx";
 
+import AnnouncementsPage from "../modules/announcements/pages/AnnouncementsPage.jsx";
+import CreateAnnouncementPage from "../modules/announcements/pages/CreateAnnouncementPage.jsx";
+import AnnouncementDetailsPage from "../modules/announcements/pages/AnnouncementDetailsPage.jsx";
+import EditAnnouncementPage from "../modules/announcements/pages/EditAnnouncementPage.jsx";
+
 import NotFoundPage from "../pages/NotFoundPage.jsx";
 import RouteErrorPage from "../pages/RouteErrorPage.jsx";
 
@@ -122,9 +127,30 @@ const router = createBrowserRouter([
             path: "/societies/:societyId/meetings/:meetingId/attendance",
             element: <MeetingAttendancePage />
           },
+
           {
             path: "/societies/:societyId/complaints",
             element: <ComplaintsPage />
+          },
+
+          {
+            path: "/societies/:societyId/announcements",
+            element: <AnnouncementsPage />
+          },
+
+          {
+            path: "/societies/:societyId/announcements/create",
+            element: <CreateAnnouncementPage />
+          },
+
+          {
+            path: "/societies/:societyId/announcements/:announcementId",
+            element: <AnnouncementDetailsPage />
+          },
+
+          {
+            path: "/societies/:societyId/announcements/:announcementId/edit",
+            element: <EditAnnouncementPage />
           }
         ]
       },
