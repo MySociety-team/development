@@ -77,13 +77,21 @@ const maintenancePaymentSchema = new mongoose.Schema(
 
 maintenancePaymentSchema.index({
   societyId: 1,
-  billId: 1
-});
-
-maintenancePaymentSchema.index({
-  societyId: 1,
   flatId: 1,
   paymentDate: -1
 });
 
+maintenancePaymentSchema.index(
+  {
+    societyId: 1,
+    billId: 1
+  },
+  {
+    unique: true,
+    partialFilterExpression: {
+      paymentMethod: "RAZORPAY",
+      status: "PENDING"
+    }
+  }
+);
 export default mongoose.model("MaintenancePayment", maintenancePaymentSchema);

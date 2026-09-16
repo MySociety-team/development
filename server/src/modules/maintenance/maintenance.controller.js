@@ -3,635 +3,449 @@ import asyncHandler from "../../utils/asyncHandler.js";
 import {
   createMaintenanceBill,
   generateMonthlyBills,
-
   getMaintenanceBill,
   getCurrentMaintenanceBill,
   getMaintenanceHistory,
   getSocietyBills,
-
   updateMaintenanceBill,
   markOverdueBills,
-
   recordOfflinePayment,
-
   getPaymentHistory,
   getSocietyPaymentHistory,
   getPayment,
-
   getMaintenanceDashboard,
   getMaintenanceTransparency,
-
+  getMaintenanceRates,
+  updateMaintenanceRate,
   createMaintenancePaymentOrder,
   verifyMaintenancePayment
 } from "./maintenance.service.js";
-
 
 // =====================================================
 // BILL CONTROLLERS
 // =====================================================
 
-const createBill = asyncHandler(
-  async (req, res) => {
+const createBill = asyncHandler(async (req, res) => {
+  const { flatId, month, maintenanceAmount, dueDate, lateFee, adjustmentReason } = req.body;
 
-    const {
-      flatId,
-      month,
-      maintenanceAmount,
-      dueDate,
-      lateFee,
-      adjustmentReason
-    } = req.body;
+  const bill = await createMaintenanceBill({
+    societyId: req.params.societyId,
 
-    const bill =
-      await createMaintenanceBill({
+    createdBy: req.user.id,
 
-        societyId:
-          req.params.societyId,
+    flatId,
 
-        userId:
-          req.user.id,
+    month,
 
-        flatId,
+    maintenanceAmount,
 
-        month,
+    dueDate,
 
-        maintenanceAmount,
+    lateFee,
 
-        dueDate,
+    adjustmentReason
+  });
 
-        lateFee,
+  res.status(201).json({
+    success: true,
 
-        adjustmentReason
-      });
+    message: "Maintenance bill created successfully",
 
-    res.status(201).json({
-
-      success: true,
-
-      message:
-        "Maintenance bill created successfully",
-
-      data: bill
-    });
-  }
-);
-
+    data: bill
+  });
+});
 
 // =====================================================
 // GENERATE MONTHLY BILLS
 // =====================================================
 
-const generateBills = asyncHandler(
-  async (req, res) => {
+const generateBills = asyncHandler(async (req, res) => {
+  const { month, dueDate, lateFee } = req.body;
 
-    const {
-      month,
-      dueDate,
-      defaultMaintenanceAmount,
-      lateFee
-    } = req.body;
+  const bills = await generateMonthlyBills({
+    societyId: req.params.societyId,
 
-    const bills =
-      await generateMonthlyBills({
+    createdBy: req.user.id,
 
-        societyId:
-          req.params.societyId,
+    month,
 
-        userId:
-          req.user.id,
+    dueDate,
 
-        month,
+    lateFee
+  });
 
-        dueDate,
+  res.status(201).json({
+    success: true,
 
-        defaultMaintenanceAmount,
+    message: "Monthly maintenance bills generated successfully",
 
-        lateFee
-      });
-
-    res.status(201).json({
-
-      success: true,
-
-      message:
-        "Monthly maintenance bills generated successfully",
-
-      data: bills
-    });
-  }
-);
-
+    data: bills
+  });
+});
 
 // =====================================================
 // GET BILL
 // =====================================================
 
-const getBill = asyncHandler(
-  async (req, res) => {
+const getBill = asyncHandler(async (req, res) => {
+  const bill = await getMaintenanceBill({
+    societyId: req.params.societyId,
 
-    const bill =
-      await getMaintenanceBill({
+    billId: req.params.billId,
 
-        societyId:
-          req.params.societyId,
+    flatId: req.societyMember.flatId,
 
-        billId:
-          req.params.billId,
+    role: req.societyMember.role
+  });
 
-        flatId:
-          req.societyMember.flatId,
+  res.status(200).json({
+    success: true,
 
-        role:
-          req.societyMember.role
-      });
-
-    res.status(200).json({
-
-      success: true,
-
-      data: bill
-    });
-  }
-);
-
+    data: bill
+  });
+});
 
 // =====================================================
 // CURRENT BILL
 // =====================================================
 
-const getCurrentBill = asyncHandler(
-  async (req, res) => {
+const getCurrentBill = asyncHandler(async (req, res) => {
+  const bill = await getCurrentMaintenanceBill({
+    societyId: req.params.societyId,
 
-    const bill =
-      await getCurrentMaintenanceBill({
+    flatId: req.societyMember.flatId
+  });
 
-        societyId:
-          req.params.societyId,
+  res.status(200).json({
+    success: true,
 
-        flatId:
-          req.societyMember.flatId
-      });
-
-    res.status(200).json({
-
-      success: true,
-
-      data: bill
-    });
-  }
-);
-
+    data: bill
+  });
+});
 
 // =====================================================
 // BILL HISTORY
 // =====================================================
 
-const getHistory = asyncHandler(
-  async (req, res) => {
+const getHistory = asyncHandler(async (req, res) => {
+  const bills = await getMaintenanceHistory({
+    societyId: req.params.societyId,
 
-    const bills =
-      await getMaintenanceHistory({
+    flatId: req.societyMember.flatId
+  });
 
-        societyId:
-          req.params.societyId,
+  res.status(200).json({
+    success: true,
 
-        flatId:
-          req.societyMember.flatId
-      });
-
-    res.status(200).json({
-
-      success: true,
-
-      data: bills
-    });
-  }
-);
-
+    data: bills
+  });
+});
 
 // =====================================================
 // SOCIETY BILLS
 // =====================================================
 
-const getBillsByMonth = asyncHandler(
-  async (req, res) => {
+const getBillsByMonth = asyncHandler(async (req, res) => {
+  const bills = await getSocietyBills({
+    societyId: req.params.societyId,
 
-    const bills =
-      await getSocietyBills({
+    month: req.query.month
+  });
 
-        societyId:
-          req.params.societyId,
+  res.status(200).json({
+    success: true,
 
-        month:
-          req.query.month
-      });
-
-    res.status(200).json({
-
-      success: true,
-
-      data: bills
-    });
-  }
-);
-
+    data: bills
+  });
+});
 
 // =====================================================
 // UPDATE BILL
 // =====================================================
 
-const updateBill = asyncHandler(
-  async (req, res) => {
+const updateBill = asyncHandler(async (req, res) => {
+  const { maintenanceAmount, dueDate, lateFee, adjustmentReason } = req.body;
 
-    const {
-      maintenanceAmount,
-      dueDate,
-      lateFee,
-      adjustmentReason
-    } = req.body;
+  const bill = await updateMaintenanceBill({
+    societyId: req.params.societyId,
 
-    const bill =
-      await updateMaintenanceBill({
+    billId: req.params.billId,
 
-        societyId:
-          req.params.societyId,
+    maintenanceAmount,
 
-        billId:
-          req.params.billId,
+    dueDate,
 
-        maintenanceAmount,
+    lateFee,
 
-        dueDate,
+    adjustmentReason
+  });
 
-        lateFee,
+  res.status(200).json({
+    success: true,
 
-        adjustmentReason
-      });
+    message: "Maintenance bill updated successfully",
 
-    res.status(200).json({
-
-      success: true,
-
-      message:
-        "Maintenance bill updated successfully",
-
-      data: bill
-    });
-  }
-);
-
+    data: bill
+  });
+});
 
 // =====================================================
-// MARK OVERDUE
+// MARK OVERDUE BILLS
 // =====================================================
 
-const markOverdue = asyncHandler(
-  async (req, res) => {
+const markOverdue = asyncHandler(async (req, res) => {
+  const result = await markOverdueBills({
+    societyId: req.params.societyId,
 
-    const result =
-      await markOverdueBills({
+    month: req.body.month
+  });
 
-        societyId:
-          req.params.societyId,
+  let message;
 
-        month:
-          req.body.month
-      });
-
-    let message;
-
-    if (
-      result.updatedCount === 0
-    ) {
-
-      message =
-        `No bills were marked overdue for ${result.month}.`;
-
-    } else if (
-      result.updatedCount === 1
-    ) {
-
-      message =
-        `1 bill was marked overdue for ${result.month}.`;
-
-    } else {
-
-      message =
-        `${result.updatedCount} bills were marked overdue for ${result.month}.`;
-    }
-
-    res.status(200).json({
-
-      success: true,
-
-      message,
-
-      data: result
-    });
+  if (result.updatedCount === 0) {
+    message = `No bills were marked overdue for ${result.month}.`;
+  } else if (result.updatedCount === 1) {
+    message = `1 bill was marked overdue for ${result.month}.`;
+  } else {
+    message = `${result.updatedCount} bills were marked overdue for ${result.month}.`;
   }
-);
 
+  res.status(200).json({
+    success: true,
+
+    message,
+
+    data: result
+  });
+});
 
 // =====================================================
 // PAYMENT CONTROLLERS
 // =====================================================
 
-
 // =====================================================
 // RECORD OFFLINE PAYMENT
 // =====================================================
 
-const recordOffline = asyncHandler(
-  async (req, res) => {
+const recordOffline = asyncHandler(async (req, res) => {
+  const { billId, amount, paymentMethod, paymentDate, transactionId } = req.body;
 
-    const {
-      billId,
-      amount,
-      paymentMethod,
-      paymentDate,
-      transactionId
-    } = req.body;
+  const payment = await recordOfflinePayment({
+    societyId: req.params.societyId,
 
-    const payment =
-      await recordOfflinePayment({
+    billId,
 
-        societyId:
-          req.params.societyId,
+    amount,
 
-        billId,
+    paymentMethod,
 
-        amount,
+    paymentDate,
 
-        paymentMethod,
+    transactionId
+  });
 
-        paymentDate,
+  res.status(201).json({
+    success: true,
 
-        transactionId
-      });
+    message: "Offline payment recorded successfully",
 
-    res.status(201).json({
-
-      success: true,
-
-      message:
-        "Offline payment recorded successfully",
-
-      data: payment
-    });
-  }
-);
-
+    data: payment
+  });
+});
 
 // =====================================================
 // MY PAYMENT HISTORY
 // =====================================================
 
-const getMyPaymentHistory =
-  asyncHandler(
-    async (req, res) => {
+const getMyPaymentHistory = asyncHandler(async (req, res) => {
+  const payments = await getPaymentHistory({
+    societyId: req.params.societyId,
 
-      const payments =
-        await getPaymentHistory({
+    flatId: req.societyMember.flatId
+  });
 
-          societyId:
-            req.params.societyId,
+  res.status(200).json({
+    success: true,
 
-          flatId:
-            req.societyMember.flatId
-        });
-
-      res.status(200).json({
-
-        success: true,
-
-        data: payments
-      });
-    }
-  );
-
+    data: payments
+  });
+});
 
 // =====================================================
 // SOCIETY PAYMENT HISTORY
 // =====================================================
 
-const getSocietyPayments =
-  asyncHandler(
-    async (req, res) => {
+const getSocietyPayments = asyncHandler(async (req, res) => {
+  const payments = await getSocietyPaymentHistory({
+    societyId: req.params.societyId,
 
-      const payments =
-        await getSocietyPaymentHistory({
+    month: req.query.month
+  });
 
-          societyId:
-            req.params.societyId,
+  res.status(200).json({
+    success: true,
 
-          month:
-            req.query.month
-        });
-
-      res.status(200).json({
-
-        success: true,
-
-        data: payments
-      });
-    }
-  );
-
+    data: payments
+  });
+});
 
 // =====================================================
 // GET PAYMENT DETAILS
 // =====================================================
 
-const getPaymentDetails =
-  asyncHandler(
-    async (req, res) => {
+const getPaymentDetails = asyncHandler(async (req, res) => {
+  const payment = await getPayment({
+    societyId: req.params.societyId,
 
-      const payment =
-        await getPayment({
+    paymentId: req.params.paymentId,
 
-          societyId:
-            req.params.societyId,
+    flatId: req.societyMember.flatId,
 
-          paymentId:
-            req.params.paymentId,
+    role: req.societyMember.role
+  });
 
-          flatId:
-            req.societyMember.flatId,
+  res.status(200).json({
+    success: true,
 
-          role:
-            req.societyMember.role
-        });
-
-      res.status(200).json({
-
-        success: true,
-
-        data: payment
-      });
-    }
-  );
-
+    data: payment
+  });
+});
 
 // =====================================================
 // DASHBOARD
 // =====================================================
 
-const getDashboard =
-  asyncHandler(
-    async (req, res) => {
+const getDashboard = asyncHandler(async (req, res) => {
+  const stats = await getMaintenanceDashboard({
+    societyId: req.params.societyId,
 
-      const stats =
-        await getMaintenanceDashboard({
+    month: req.query.month
+  });
 
-          societyId:
-            req.params.societyId,
+  res.status(200).json({
+    success: true,
 
-          month:
-            req.query.month
-        });
-
-      res.status(200).json({
-
-        success: true,
-
-        data: stats
-      });
-    }
-  );
-
+    data: stats
+  });
+});
 
 // =====================================================
 // TRANSPARENCY
 // =====================================================
-//
-// Any active society member can view:
-//
-// - All flat numbers
-// - Bill amount
-// - Payment status
-// - Payment date
-//
-// Private information is NOT returned.
-//
-// Possible status:
-//
-// - PAID
-// - PENDING
-// - OVERDUE
-// - NO_BILL
+
+const getTransparency = asyncHandler(async (req, res) => {
+  const stats = await getMaintenanceTransparency({
+    societyId: req.params.societyId,
+
+    month: req.query.month
+  });
+
+  res.status(200).json({
+    success: true,
+
+    data: stats
+  });
+});
+
+// =====================================================
+// MAINTENANCE RATE CONTROLLERS
 // =====================================================
 
-const getTransparency =
-  asyncHandler(
-    async (req, res) => {
+// =====================================================
+// GET MAINTENANCE RATES
+// =====================================================
 
-      const stats =
-        await getMaintenanceTransparency({
+const getRates = asyncHandler(async (req, res) => {
+  const rates = await getMaintenanceRates({
+    societyId: req.params.societyId
+  });
 
-          societyId:
-            req.params.societyId,
+  res.status(200).json({
+    success: true,
 
-          month:
-            req.query.month
-        });
+    data: rates
+  });
+});
 
-      res.status(200).json({
+// =====================================================
+// UPDATE MAINTENANCE RATE
+// =====================================================
 
-        success: true,
+const updateRate = asyncHandler(async (req, res) => {
+  const { flatType, amount } = req.body;
 
-        data: stats
-      });
-    }
-  );
+  const rate = await updateMaintenanceRate({
+    societyId: req.params.societyId,
 
+    flatType,
+
+    amount
+  });
+
+  res.status(200).json({
+    success: true,
+
+    message: `${flatType} maintenance rate updated successfully`,
+
+    data: rate
+  });
+});
 
 // =====================================================
 // RAZORPAY - CREATE ORDER
 // =====================================================
 
-const createPaymentOrder =
-  asyncHandler(
-    async (req, res) => {
+const createPaymentOrder = asyncHandler(async (req, res) => {
+  const result = await createMaintenancePaymentOrder({
+    societyId: req.params.societyId,
 
-      const result =
-        await createMaintenancePaymentOrder({
+    billId: req.body.billId,
 
-          societyId:
-            req.params.societyId,
+    flatId: req.societyMember.flatId,
 
-          billId:
-            req.body.billId,
+    role: req.societyMember.role,
 
-          flatId:
-            req.societyMember.flatId,
+    userId: req.user.id
+  });
 
-          role:
-            req.societyMember.role,
+  res.status(201).json({
+    success: true,
 
-          // FIX:
-          // Pass logged-in user's ID to the service
-          userId:
-            req.user.id
-        });
+    message: "Maintenance payment order created successfully",
 
-      res.status(201).json({
-
-        success: true,
-
-        message:
-          "Maintenance payment order created successfully",
-
-        data: result
-      });
-    }
-  );
-
+    data: result
+  });
+});
 
 // =====================================================
 // RAZORPAY - VERIFY PAYMENT
 // =====================================================
 
-const verifyPayment =
-  asyncHandler(
-    async (req, res) => {
+const verifyPayment = asyncHandler(async (req, res) => {
+  const payment = await verifyMaintenancePayment({
+    societyId: req.params.societyId,
 
-      const payment =
-        await verifyMaintenancePayment({
+    billId: req.body.billId,
 
-          societyId:
-            req.params.societyId,
+    flatId: req.societyMember.flatId,
 
-          billId:
-            req.body.billId,
+    role: req.societyMember.role,
 
-          flatId:
-            req.societyMember.flatId,
+    razorpayOrderId: req.body.razorpay_order_id,
 
-          role:
-            req.societyMember.role,
+    razorpayPaymentId: req.body.razorpay_payment_id,
 
-          razorpay_order_id:
-            req.body.razorpay_order_id,
+    razorpaySignature: req.body.razorpay_signature
+  });
 
-          razorpay_payment_id:
-            req.body.razorpay_payment_id,
+  res.status(200).json({
+    success: true,
 
-          razorpay_signature:
-            req.body.razorpay_signature
-        });
+    message: "Maintenance payment verified successfully",
 
-      res.status(200).json({
-
-        success: true,
-
-        message:
-          "Maintenance payment verified successfully",
-
-        data: payment
-      });
-    }
-  );
-
+    data: payment
+  });
+});
 
 // =====================================================
 // EXPORTS
@@ -640,24 +454,20 @@ const verifyPayment =
 export {
   createBill,
   generateBills,
-
   getBill,
   getCurrentBill,
   getHistory,
   getBillsByMonth,
-
   updateBill,
   markOverdue,
-
   recordOffline,
-
   getMyPaymentHistory,
   getSocietyPayments,
   getPaymentDetails,
-
   getDashboard,
   getTransparency,
-
+  getRates,
+  updateRate,
   createPaymentOrder,
   verifyPayment
 };

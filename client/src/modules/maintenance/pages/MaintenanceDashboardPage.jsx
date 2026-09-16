@@ -9,21 +9,23 @@ import {
   generateMonthlyBills,
   updateMaintenanceBill,
   recordOfflineMaintenancePayment,
-  markMaintenanceBillsOverdue
+  markMaintenanceBillsOverdue,
+  getMaintenanceRates,
+  updateMaintenanceRate
 } from "../api/maintenance.api.js";
 
 // =====================================================
 // HELPERS
 // =====================================================
 
+const FLAT_TYPES = ["1RK", "1BHK", "2BHK", "3BHK", "4BHK", "5BHK"];
+
 const getCurrentMonth = () => {
   const now = new Date();
 
   const year = now.getFullYear();
 
-  const month = String(
-    now.getMonth() + 1
-  ).padStart(2, "0");
+  const month = String(now.getMonth() + 1).padStart(2, "0");
 
   return `${year}-${month}`;
 };
@@ -33,60 +35,31 @@ const getBillId = (bill) => {
 };
 
 const getFlatNumber = (bill) => {
-  if (
-    bill?.flatId &&
-    typeof bill.flatId === "object"
-  ) {
-    return (
-      bill.flatId.flatNumber ||
-      "N/A"
-    );
+  if (bill?.flatId && typeof bill.flatId === "object") {
+    return bill.flatId.flatNumber || "N/A";
   }
 
-  return (
-    bill?.flatNumber ||
-    "N/A"
-  );
+  return bill?.flatNumber || "N/A";
 };
 
 const getPaymentFlatNumber = (payment) => {
-  if (
-    payment?.flatId &&
-    typeof payment.flatId === "object"
-  ) {
-    return (
-      payment.flatId.flatNumber ||
-      "N/A"
-    );
+  if (payment?.flatId && typeof payment.flatId === "object") {
+    return payment.flatId.flatNumber || "N/A";
   }
 
-  return (
-    payment?.flatNumber ||
-    "N/A"
-  );
+  return payment?.flatNumber || "N/A";
 };
 
 const getPaymentMonth = (payment) => {
-  if (
-    payment?.billId &&
-    typeof payment.billId === "object"
-  ) {
-    return (
-      payment.billId.month ||
-      "N/A"
-    );
+  if (payment?.billId && typeof payment.billId === "object") {
+    return payment.billId.month || "N/A";
   }
 
-  return (
-    payment?.month ||
-    "N/A"
-  );
+  return payment?.month || "N/A";
 };
 
 const formatAmount = (amount) => {
-  return `₹${Number(
-    amount || 0
-  ).toLocaleString("en-IN")}`;
+  return `₹${Number(amount || 0).toLocaleString("en-IN")}`;
 };
 
 const formatDate = (date) => {
@@ -94,9 +67,7 @@ const formatDate = (date) => {
     return "N/A";
   }
 
-  return new Date(
-    date
-  ).toLocaleDateString("en-IN");
+  return new Date(date).toLocaleDateString("en-IN");
 };
 
 const getStatusClasses = (status) => {
@@ -125,12 +96,8 @@ const getPaymentMethodTotals = (payments) => {
   };
 
   payments.forEach((payment) => {
-    if (
-      payment.status === "SUCCESS" &&
-      totals[payment.paymentMethod] !== undefined
-    ) {
-      totals[payment.paymentMethod] +=
-        Number(payment.amount || 0);
+    if (payment.status === "SUCCESS" && totals[payment.paymentMethod] !== undefined) {
+      totals[payment.paymentMethod] += Number(payment.amount || 0);
     }
   });
 
@@ -148,62 +115,56 @@ const MaintenanceDashboardPage = () => {
   // BASIC STATE
   // ===================================================
 
-  const [month, setMonth] =
-    useState(getCurrentMonth());
+  const [month, setMonth] = useState(getCurrentMonth());
 
-  const [dashboard, setDashboard] =
-    useState(null);
+  const [dashboard, setDashboard] = useState(null);
 
-  const [bills, setBills] =
-    useState([]);
+  const [bills, setBills] = useState([]);
 
-  const [payments, setPayments] =
-    useState([]);
+  const [payments, setPayments] = useState([]);
 
-  const [loading, setLoading] =
-    useState(true);
+  const [loading, setLoading] = useState(true);
 
-  const [error, setError] =
-    useState("");
+  const [error, setError] = useState("");
 
-  const [message, setMessage] =
-    useState("");
+  const [message, setMessage] = useState("");
+
+  // ===================================================
+  // MAINTENANCE RATE STATE
+  // ===================================================
+
+  const [maintenanceRates, setMaintenanceRates] = useState({});
+
+  const [rateForm, setRateForm] = useState({
+    "1RK": "",
+    "1BHK": "",
+    "2BHK": "",
+    "3BHK": "",
+    "4BHK": "",
+    "5BHK": ""
+  });
+
+  const [savingRate, setSavingRate] = useState("");
 
   // ===================================================
   // MODAL STATE
   // ===================================================
 
-  const [
-    showGenerateModal,
-    setShowGenerateModal
-  ] = useState(false);
+  const [showGenerateModal, setShowGenerateModal] = useState(false);
 
-  const [
-    showEditModal,
-    setShowEditModal
-  ] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
 
-  const [
-    showOfflineModal,
-    setShowOfflineModal
-  ] = useState(false);
+  const [showOfflineModal, setShowOfflineModal] = useState(false);
 
-  const [
-    selectedBill,
-    setSelectedBill
-  ] = useState(null);
+  const [selectedBill, setSelectedBill] = useState(null);
 
   // ===================================================
   // GENERATE FORM
   // ===================================================
 
-  const [
-    generateForm,
-    setGenerateForm
-  ] = useState({
+  const [generateForm, setGenerateForm] = useState({
     month: getCurrentMonth(),
     dueDate: "",
-    defaultMaintenanceAmount: "",
     lateFee: ""
   });
 
@@ -211,10 +172,7 @@ const MaintenanceDashboardPage = () => {
   // EDIT FORM
   // ===================================================
 
-  const [
-    editForm,
-    setEditForm
-  ] = useState({
+  const [editForm, setEditForm] = useState({
     maintenanceAmount: "",
     dueDate: "",
     lateFee: "",
@@ -225,16 +183,11 @@ const MaintenanceDashboardPage = () => {
   // OFFLINE PAYMENT FORM
   // ===================================================
 
-  const [
-    offlineForm,
-    setOfflineForm
-  ] = useState({
+  const [offlineForm, setOfflineForm] = useState({
     billId: "",
     amount: "",
     paymentMethod: "CASH",
-    paymentDate: new Date()
-      .toISOString()
-      .split("T")[0],
+    paymentDate: new Date().toISOString().split("T")[0],
     transactionId: ""
   });
 
@@ -242,40 +195,144 @@ const MaintenanceDashboardPage = () => {
   // REPORT CALCULATIONS
   // ===================================================
 
-  const paymentMethodTotals =
-    getPaymentMethodTotals(payments);
+  const paymentMethodTotals = getPaymentMethodTotals(payments);
 
-  const paidBills =
-    bills.filter(
-      (bill) =>
-        bill.status === "PAID"
-    ).length;
+  const paidBills = bills.filter((bill) => bill.status === "PAID").length;
 
-  const pendingBills =
-    bills.filter(
-      (bill) =>
-        bill.status === "PENDING"
-    ).length;
+  const pendingBills = bills.filter((bill) => bill.status === "PENDING").length;
 
-  const overdueBills =
-    bills.filter(
-      (bill) =>
-        bill.status === "OVERDUE"
-    ).length;
+  const overdueBills = bills.filter((bill) => bill.status === "OVERDUE").length;
 
   const outstandingAmount =
-    Number(
-      dashboard?.pendingAmount || 0
-    ) +
-    Number(
-      dashboard?.overdueAmount || 0
-    );
+    Number(dashboard?.pendingAmount || 0) + Number(dashboard?.overdueAmount || 0);
 
-  const successfulPayments =
-    payments.filter(
-      (payment) =>
-        payment.status === "SUCCESS"
-    ).length;
+  const successfulPayments = payments.filter((payment) => payment.status === "SUCCESS").length;
+
+  // ===================================================
+  // LOAD MAINTENANCE RATES
+  // ===================================================
+
+  // const loadMaintenanceRates = async () => {
+  //   try {
+  //     const ratesData =
+  //       await getMaintenanceRates(
+  //         societyId
+  //       );
+
+  //     const rateMap = {};
+
+  //     if (
+  //       Array.isArray(ratesData)
+  //     ) {
+  //       ratesData.forEach(
+  //         (rate) => {
+  //           if (
+  //             rate?.flatType
+  //           ) {
+  //             rateMap[
+  //               rate.flatType
+  //             ] = Number(
+  //               rate.amount || 0
+  //             );
+  //           }
+  //         }
+  //       );
+  //     }
+
+  //     setMaintenanceRates(
+  //       rateMap
+  //     );
+
+  //     setRateForm({
+  //       "1RK":
+  //         rateMap["1RK"] ??
+  //         "",
+  //       "1BHK":
+  //         rateMap["1BHK"] ??
+  //         "",
+  //       "2BHK":
+  //         rateMap["2BHK"] ??
+  //         "",
+  //       "3BHK":
+  //         rateMap["3BHK"] ??
+  //         "",
+  //       "4BHK":
+  //         rateMap["4BHK"] ??
+  //         "",
+  //       "5BHK":
+  //         rateMap["5BHK"] ??
+  //         ""
+  //     });
+
+  //   } catch (err) {
+  //     console.error(
+  //       "Maintenance rates error:",
+  //       err
+  //     );
+
+  //     setError(
+  //       err?.response?.data?.message ||
+  //       err?.message ||
+  //       "Failed to load maintenance rates"
+  //     );
+  //   }
+  // };
+
+  // ===================================================
+  // UPDATE MAINTENANCE RATE
+  // ===================================================
+
+  const handleUpdateRate = async (flatType) => {
+    const value = rateForm[flatType];
+
+    if (value === "" || value === null || value === undefined) {
+      setError(`Please enter a rate for ${flatType}.`);
+
+      return;
+    }
+
+    const amount = Number(value);
+
+    if (Number.isNaN(amount) || amount < 0) {
+      setError(`Please enter a valid amount for ${flatType}.`);
+
+      return;
+    }
+
+    try {
+      setSavingRate(flatType);
+
+      setError("");
+      setMessage("");
+
+      const updatedRate = await updateMaintenanceRate(societyId, {
+        flatType,
+        amount
+      });
+
+      setMaintenanceRates((previous) => ({
+        ...previous,
+        [flatType]: Number(updatedRate?.amount ?? amount)
+      }));
+
+      setRateForm((previous) => ({
+        ...previous,
+        [flatType]: Number(updatedRate?.amount ?? amount)
+      }));
+
+      setMessage(`${flatType} maintenance rate updated successfully.`);
+    } catch (err) {
+      console.error("Update maintenance rate error:", err);
+
+      setError(
+        err?.response?.data?.message ||
+          err?.message ||
+          `Failed to update ${flatType} maintenance rate`
+      );
+    } finally {
+      setSavingRate("");
+    }
+  };
 
   // ===================================================
   // LOAD DASHBOARD
@@ -286,52 +343,31 @@ const MaintenanceDashboardPage = () => {
       setLoading(true);
       setError("");
 
-      const dashboardData =
-        await getMaintenanceDashboard(
-          societyId,
-          month
-        );
+      const dashboardData = await getMaintenanceDashboard(societyId, month);
 
-      const billsData =
-        await getSocietyBills(
-          societyId,
-          month
-        );
+      const billsData = await getSocietyBills(societyId, month);
 
-      const paymentsData =
-        await getSocietyPaymentHistory(
-          societyId,
-          month
-        );
+      const paymentsData = await getSocietyPaymentHistory(societyId, month);
 
-      setDashboard(
-        dashboardData
-      );
+      const normalizedDashboard = dashboardData?.stats
+        ? {
+            ...dashboardData.stats,
+            month: dashboardData.month || month,
+            bills: Array.isArray(dashboardData.bills) ? dashboardData.bills : []
+          }
+        : dashboardData;
 
-      setBills(
-        Array.isArray(billsData)
-          ? billsData
-          : []
-      );
+      setDashboard(normalizedDashboard);
 
-      setPayments(
-        Array.isArray(paymentsData)
-          ? paymentsData
-          : []
-      );
+      setBills(Array.isArray(billsData) ? billsData : []);
 
+      setPayments(Array.isArray(paymentsData) ? paymentsData : []);
     } catch (err) {
-      console.error(
-        "Dashboard error:",
-        err
-      );
+      console.error("Dashboard error:", err);
 
       setError(
-        err?.response?.data?.message ||
-        err?.message ||
-        "Failed to load maintenance dashboard"
+        err?.response?.data?.message || err?.message || "Failed to load maintenance dashboard"
       );
-
     } finally {
       setLoading(false);
     }
@@ -350,62 +386,68 @@ const MaintenanceDashboardPage = () => {
 
     const load = async () => {
       try {
-        const dashboardData =
-          await getMaintenanceDashboard(
-            societyId,
-            month
-          );
+        setLoading(true);
 
-        const billsData =
-          await getSocietyBills(
-            societyId,
-            month
-          );
+        const [dashboardData, billsData, paymentsData, ratesData] = await Promise.all([
+          getMaintenanceDashboard(societyId, month),
 
-        const paymentsData =
-          await getSocietyPaymentHistory(
-            societyId,
-            month
-          );
+          getSocietyBills(societyId, month),
+
+          getSocietyPaymentHistory(societyId, month),
+
+          getMaintenanceRates(societyId)
+        ]);
 
         if (cancelled) {
           return;
         }
 
-        setDashboard(
-          dashboardData
-        );
+        const normalizedDashboard = dashboardData?.stats
+          ? {
+              ...dashboardData.stats,
+              month: dashboardData.month || month,
+              bills: Array.isArray(dashboardData.bills) ? dashboardData.bills : []
+            }
+          : dashboardData;
 
-        setBills(
-          Array.isArray(billsData)
-            ? billsData
-            : []
-        );
+        setDashboard(normalizedDashboard);
 
-        setPayments(
-          Array.isArray(paymentsData)
-            ? paymentsData
-            : []
-        );
+        setBills(Array.isArray(billsData) ? billsData : []);
+
+        setPayments(Array.isArray(paymentsData) ? paymentsData : []);
+
+        const rateMap = {};
+
+        if (Array.isArray(ratesData)) {
+          ratesData.forEach((rate) => {
+            if (rate?.flatType) {
+              rateMap[rate.flatType] = Number(rate.amount || 0);
+            }
+          });
+        }
+
+        setMaintenanceRates(rateMap);
+
+        setRateForm({
+          "1RK": rateMap["1RK"] ?? "",
+          "1BHK": rateMap["1BHK"] ?? "",
+          "2BHK": rateMap["2BHK"] ?? "",
+          "3BHK": rateMap["3BHK"] ?? "",
+          "4BHK": rateMap["4BHK"] ?? "",
+          "5BHK": rateMap["5BHK"] ?? ""
+        });
 
         setError("");
-
       } catch (err) {
         if (cancelled) {
           return;
         }
 
-        console.error(
-          "Dashboard error:",
-          err
-        );
+        console.error("Dashboard error:", err);
 
         setError(
-          err?.response?.data?.message ||
-          err?.message ||
-          "Failed to load maintenance dashboard"
+          err?.response?.data?.message || err?.message || "Failed to load maintenance dashboard"
         );
-
       } finally {
         if (!cancelled) {
           setLoading(false);
@@ -418,16 +460,11 @@ const MaintenanceDashboardPage = () => {
     return () => {
       cancelled = true;
     };
-
-  }, [
-    societyId,
-    month
-  ]);
+  }, [societyId, month]);
 
   // ===================================================
   // GENERATE BILLS
   // ===================================================
-
   const handleGenerateBills = async (e) => {
     e.preventDefault();
 
@@ -435,55 +472,66 @@ const MaintenanceDashboardPage = () => {
       setError("");
       setMessage("");
 
-      await generateMonthlyBills(
-        societyId,
-        {
-          month:
-            generateForm.month,
+      const result = await generateMonthlyBills(societyId, {
+        month: generateForm.month,
 
-          dueDate:
-            generateForm.dueDate,
+        dueDate: generateForm.dueDate,
 
-          defaultMaintenanceAmount:
-            Number(
-              generateForm
-                .defaultMaintenanceAmount
-            ),
+        lateFee: Number(generateForm.lateFee || 0)
+      });
 
-          lateFee:
-            Number(
-              generateForm.lateFee ||
-              0
-            )
-        }
-      );
+      const createdCount = Number(result?.createdCount || 0);
 
-      setMessage(
-        `Monthly bills generated successfully for ${generateForm.month}.`
-      );
+      const skippedCount = Number(result?.skippedCount || 0);
+
+      // -----------------------------------------------
+      // All bills already existed
+      // -----------------------------------------------
+
+      if (createdCount === 0 && skippedCount > 0) {
+        setMessage(
+          `Bills for ${generateForm.month} have already been generated. No new bills were created.`
+        );
+      }
+
+      // -----------------------------------------------
+      // New bills created
+      // -----------------------------------------------
+      else if (createdCount > 0 && skippedCount === 0) {
+        setMessage(
+          `${createdCount} maintenance bills generated successfully for ${generateForm.month}.`
+        );
+      }
+
+      // -----------------------------------------------
+      // Some existed, some were created
+      // -----------------------------------------------
+      else if (createdCount > 0 && skippedCount > 0) {
+        setMessage(
+          `${createdCount} new maintenance bills generated for ${generateForm.month}. ${skippedCount} bills already existed.`
+        );
+      }
+
+      // -----------------------------------------------
+      // Nothing to create
+      // -----------------------------------------------
+      else {
+        setMessage(`No new bills were created for ${generateForm.month}.`);
+      }
 
       setShowGenerateModal(false);
 
       setGenerateForm({
         month,
         dueDate: "",
-        defaultMaintenanceAmount: "",
         lateFee: ""
       });
 
       await loadDashboard();
-
     } catch (err) {
-      console.error(
-        "Generate bills error:",
-        err
-      );
+      console.error("Generate bills error:", err);
 
-      setError(
-        err?.response?.data?.message ||
-        err?.message ||
-        "Failed to generate bills"
-      );
+      setError(err?.response?.data?.message || err?.message || "Failed to generate bills");
     }
   };
 
@@ -495,26 +543,13 @@ const MaintenanceDashboardPage = () => {
     setSelectedBill(bill);
 
     setEditForm({
-      maintenanceAmount:
-        bill?.maintenanceAmount ??
-        "",
+      maintenanceAmount: bill?.maintenanceAmount ?? "",
 
-      dueDate:
-        bill?.dueDate
-          ? new Date(
-              bill.dueDate
-            )
-              .toISOString()
-              .split("T")[0]
-          : "",
+      dueDate: bill?.dueDate ? new Date(bill.dueDate).toISOString().split("T")[0] : "",
 
-      lateFee:
-        bill?.lateFee ??
-        "",
+      lateFee: bill?.lateFee ?? "",
 
-      adjustmentReason:
-        bill?.adjustmentReason ||
-        ""
+      adjustmentReason: bill?.adjustmentReason || ""
     });
 
     setShowEditModal(true);
@@ -528,32 +563,21 @@ const MaintenanceDashboardPage = () => {
     e.preventDefault();
 
     if (!selectedBill) {
-      setError(
-        "No bill selected."
-      );
+      setError("No bill selected.");
 
       return;
     }
 
-    const billId =
-      getBillId(selectedBill);
+    const billId = getBillId(selectedBill);
 
     if (!billId) {
-      setError(
-        "Bill ID is missing."
-      );
+      setError("Bill ID is missing.");
 
       return;
     }
 
-    // Adjustment reason is mandatory
-    // whenever a bill is edited.
-    if (
-      !editForm.adjustmentReason.trim()
-    ) {
-      setError(
-        "Adjustment reason is required when editing a maintenance bill."
-      );
+    if (!editForm.adjustmentReason.trim()) {
+      setError("Adjustment reason is required when editing a maintenance bill.");
 
       return;
     }
@@ -562,50 +586,26 @@ const MaintenanceDashboardPage = () => {
       setError("");
       setMessage("");
 
-      await updateMaintenanceBill(
-        societyId,
-        billId,
-        {
-          maintenanceAmount:
-            Number(
-              editForm
-                .maintenanceAmount
-            ),
+      await updateMaintenanceBill(societyId, billId, {
+        maintenanceAmount: Number(editForm.maintenanceAmount),
 
-          dueDate:
-            editForm.dueDate,
+        dueDate: editForm.dueDate,
 
-          lateFee:
-            Number(
-              editForm.lateFee ||
-              0
-            ),
+        lateFee: Number(editForm.lateFee || 0),
 
-          adjustmentReason:
-            editForm.adjustmentReason.trim()
-        }
-      );
+        adjustmentReason: editForm.adjustmentReason.trim()
+      });
 
-      setMessage(
-        "Maintenance bill updated successfully."
-      );
+      setMessage("Maintenance bill updated successfully.");
 
       setShowEditModal(false);
       setSelectedBill(null);
 
       await loadDashboard();
-
     } catch (err) {
-      console.error(
-        "Update bill error:",
-        err
-      );
+      console.error("Update bill error:", err);
 
-      setError(
-        err?.response?.data?.message ||
-        err?.message ||
-        "Failed to update bill"
-      );
+      setError(err?.response?.data?.message || err?.message || "Failed to update bill");
     }
   };
 
@@ -613,32 +613,19 @@ const MaintenanceDashboardPage = () => {
   // OPEN OFFLINE PAYMENT MODAL
   // ===================================================
 
-  const openOfflinePaymentModal = (
-    bill = null
-  ) => {
+  const openOfflinePaymentModal = (bill = null) => {
     setSelectedBill(bill);
 
     setOfflineForm({
-      billId:
-        bill
-          ? getBillId(bill)
-          : "",
+      billId: bill ? getBillId(bill) : "",
 
-      amount:
-        bill
-          ? bill.totalAmount
-          : "",
+      amount: bill ? bill.totalAmount : "",
 
-      paymentMethod:
-        "CASH",
+      paymentMethod: "CASH",
 
-      paymentDate:
-        new Date()
-          .toISOString()
-          .split("T")[0],
+      paymentDate: new Date().toISOString().split("T")[0],
 
-      transactionId:
-        ""
+      transactionId: ""
     });
 
     setShowOfflineModal(true);
@@ -648,120 +635,72 @@ const MaintenanceDashboardPage = () => {
   // RECORD OFFLINE PAYMENT
   // ===================================================
 
-  const handleOfflinePayment =
-    async (e) => {
-      e.preventDefault();
+  const handleOfflinePayment = async (e) => {
+    e.preventDefault();
 
-      if (
-        !offlineForm.billId
-      ) {
-        setError(
-          "Please select a bill."
-        );
+    if (!offlineForm.billId) {
+      setError("Please select a bill.");
 
-        return;
-      }
+      return;
+    }
 
-      try {
-        setError("");
-        setMessage("");
+    try {
+      setError("");
+      setMessage("");
 
-        await recordOfflineMaintenancePayment(
-          societyId,
-          {
-            billId:
-              offlineForm.billId,
+      await recordOfflineMaintenancePayment(societyId, {
+        billId: offlineForm.billId,
 
-            amount:
-              Number(
-                offlineForm.amount
-              ),
+        amount: Number(offlineForm.amount),
 
-            paymentMethod:
-              offlineForm.paymentMethod,
+        paymentMethod: offlineForm.paymentMethod,
 
-            paymentDate:
-              offlineForm.paymentDate,
+        paymentDate: offlineForm.paymentDate,
 
-            transactionId:
-              offlineForm.transactionId
-          }
-        );
+        transactionId: offlineForm.transactionId
+      });
 
-        setMessage(
-          "Offline payment recorded successfully."
-        );
+      setMessage("Offline payment recorded successfully.");
 
-        setShowOfflineModal(false);
-        setSelectedBill(null);
+      setShowOfflineModal(false);
+      setSelectedBill(null);
 
-        await loadDashboard();
+      await loadDashboard();
+    } catch (err) {
+      console.error("Offline payment error:", err);
 
-      } catch (err) {
-        console.error(
-          "Offline payment error:",
-          err
-        );
-
-        setError(
-          err?.response?.data?.message ||
-          err?.message ||
-          "Failed to record offline payment"
-        );
-      }
-    };
+      setError(err?.response?.data?.message || err?.message || "Failed to record offline payment");
+    }
+  };
 
   // ===================================================
   // MARK OVERDUE
   // ===================================================
 
-  const handleMarkOverdue =
-    async () => {
-      try {
-        setError("");
-        setMessage("");
+  const handleMarkOverdue = async () => {
+    try {
+      setError("");
+      setMessage("");
 
-        const result =
-          await markMaintenanceBillsOverdue(
-            societyId,
-            month
-          );
+      const result = await markMaintenanceBillsOverdue(societyId, month);
 
-        if (
-          result?.updatedCount === 0
-        ) {
-          setMessage(
-            `No bills were marked overdue for ${month}.`
-          );
-        } else if (
-          result?.updatedCount === 1
-        ) {
-          setMessage(
-            `1 bill was marked overdue for ${month}.`
-          );
-        } else {
-          setMessage(
-            `${result.updatedCount} bills were marked overdue for ${month}.`
-          );
-        }
-
-        await loadDashboard();
-
-      } catch (err) {
-        console.error(
-          "Mark overdue error:",
-          err
-        );
-
-        setMessage("");
-
-        setError(
-          err?.response?.data?.message ||
-          err?.message ||
-          "Failed to mark overdue bills"
-        );
+      if (result?.updatedCount === 0) {
+        setMessage(`No bills were marked overdue for ${month}.`);
+      } else if (result?.updatedCount === 1) {
+        setMessage(`1 bill was marked overdue for ${month}.`);
+      } else {
+        setMessage(`${result.updatedCount} bills were marked overdue for ${month}.`);
       }
-    };
+
+      await loadDashboard();
+    } catch (err) {
+      console.error("Mark overdue error:", err);
+
+      setMessage("");
+
+      setError(err?.response?.data?.message || err?.message || "Failed to mark overdue bills");
+    }
+  };
 
   // ===================================================
   // LOADING SCREEN
@@ -775,17 +714,11 @@ const MaintenanceDashboardPage = () => {
         backTo={`/societies/${societyId}/dashboard`}
       >
         <div className="flex min-h-[300px] items-center justify-center">
-
           <div className="text-center">
-
             <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-slate-900" />
 
-            <p className="mt-4 text-sm text-slate-500">
-              Loading maintenance dashboard...
-            </p>
-
+            <p className="mt-4 text-sm text-slate-500">Loading maintenance dashboard...</p>
           </div>
-
         </div>
       </AppShell>
     );
@@ -801,9 +734,7 @@ const MaintenanceDashboardPage = () => {
       description="Manage society maintenance bills and payments."
       backTo={`/societies/${societyId}/dashboard`}
     >
-
       <div className="space-y-8">
-
         {/* =================================================
             SUCCESS MESSAGE
         ================================================= */}
@@ -829,35 +760,108 @@ const MaintenanceDashboardPage = () => {
         ================================================= */}
 
         <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_14px_45px_-28px_rgba(15,23,42,0.3)]">
-
           <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-
             <div>
               <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">
                 Billing Period
               </p>
 
-              <h2 className="mt-1 text-xl font-bold text-slate-950">
-                Select Month
-              </h2>
+              <h2 className="mt-1 text-xl font-bold text-slate-950">Select Month</h2>
             </div>
 
             <input
               type="month"
               value={month}
               onChange={(e) => {
-                setMonth(
-                  e.target.value
-                );
+                setMonth(e.target.value);
 
                 setMessage("");
                 setError("");
               }}
               className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-900 outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-100"
             />
+          </div>
+        </section>
 
+        {/* =================================================
+            MAINTENANCE RATES
+        ================================================= */}
+
+        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_14px_45px_-28px_rgba(15,23,42,0.3)]">
+          <div className="mb-6">
+            <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">
+              Configuration
+            </p>
+
+            <h2 className="mt-1 text-xl font-bold text-slate-950">Maintenance Rates</h2>
+
+            <p className="mt-1 text-sm text-slate-500">
+              Set the monthly maintenance amount for each flat type. These rates are used when
+              generating new bills.
+            </p>
           </div>
 
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {FLAT_TYPES.map((flatType) => (
+              <div key={flatType} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div className="mb-3 flex items-center justify-between">
+                  <label htmlFor={`rate-${flatType}`} className="text-sm font-bold text-slate-900">
+                    {flatType}
+                  </label>
+
+                  <span className="text-xs text-slate-500">Monthly</span>
+                </div>
+
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-medium text-slate-500">
+                      ₹
+                    </span>
+
+                    <input
+                      id={`rate-${flatType}`}
+                      type="number"
+                      min="0"
+                      value={rateForm[flatType]}
+                      onChange={(e) =>
+                        setRateForm((previous) => ({
+                          ...previous,
+                          [flatType]: e.target.value
+                        }))
+                      }
+                      placeholder="2000"
+                      className="w-full rounded-xl border border-slate-300 bg-white py-2.5 pl-8 pr-3 text-sm font-medium text-slate-900 outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-100"
+                    />
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => handleUpdateRate(flatType)}
+                    disabled={savingRate === flatType}
+                    className="rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {savingRate === flatType ? "Saving..." : "Save"}
+                  </button>
+                </div>
+
+                {maintenanceRates[flatType] !== undefined && (
+                  <p className="mt-2 text-xs text-slate-500">
+                    Current rate:{" "}
+                    <span className="font-semibold text-slate-700">
+                      {formatAmount(maintenanceRates[flatType])}
+                    </span>
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-5 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3">
+            <p className="text-sm text-blue-700">
+              <span className="font-semibold">Note:</span> Changing a rate affects only bills
+              generated after the change. Existing bills keep their original amount.
+            </p>
+          </div>
         </section>
 
         {/* =================================================
@@ -865,101 +869,65 @@ const MaintenanceDashboardPage = () => {
         ================================================= */}
 
         <section>
-
           <div className="mb-4">
             <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">
               Overview
             </p>
 
-            <h2 className="mt-1 text-xl font-bold text-slate-950">
-              Maintenance Collection
-            </h2>
+            <h2 className="mt-1 text-xl font-bold text-slate-950">Maintenance Collection</h2>
           </div>
 
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-
             {/* EXPECTED */}
 
             <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_14px_45px_-28px_rgba(15,23,42,0.3)]">
-
-              <p className="text-sm font-medium text-slate-500">
-                Expected Amount
-              </p>
+              <p className="text-sm font-medium text-slate-500">Expected Amount</p>
 
               <h2 className="mt-2 text-2xl font-bold text-slate-950">
-                {formatAmount(
-                  dashboard?.expectedAmount
-                )}
+                {formatAmount(dashboard?.expectedAmount)}
               </h2>
 
               <p className="mt-1 text-sm text-slate-500">
-                {dashboard?.totalFlats || 0} flats
+                {dashboard?.totalFlats ?? bills.length} flats
               </p>
-
             </div>
 
             {/* COLLECTED */}
 
             <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_14px_45px_-28px_rgba(15,23,42,0.3)]">
-
-              <p className="text-sm font-medium text-slate-500">
-                Collected
-              </p>
+              <p className="text-sm font-medium text-slate-500">Collected</p>
 
               <h2 className="mt-2 text-2xl font-bold text-green-600">
-                {formatAmount(
-                  dashboard?.collectedAmount
-                )}
+                {formatAmount(dashboard?.collectedAmount)}
               </h2>
 
-              <p className="mt-1 text-sm text-slate-500">
-                {dashboard?.paidCount || 0} paid
-              </p>
-
+              <p className="mt-1 text-sm text-slate-500">{dashboard?.paidCount || 0} paid</p>
             </div>
 
             {/* PENDING */}
 
             <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_14px_45px_-28px_rgba(15,23,42,0.3)]">
-
-              <p className="text-sm font-medium text-slate-500">
-                Pending
-              </p>
+              <p className="text-sm font-medium text-slate-500">Pending</p>
 
               <h2 className="mt-2 text-2xl font-bold text-yellow-600">
-                {formatAmount(
-                  dashboard?.pendingAmount
-                )}
+                {formatAmount(dashboard?.pendingAmount)}
               </h2>
 
-              <p className="mt-1 text-sm text-slate-500">
-                {dashboard?.pendingCount || 0} pending
-              </p>
-
+              <p className="mt-1 text-sm text-slate-500">{dashboard?.pendingCount || 0} pending</p>
             </div>
 
             {/* OVERDUE */}
 
             <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_14px_45px_-28px_rgba(15,23,42,0.3)]">
-
-              <p className="text-sm font-medium text-slate-500">
-                Overdue
-              </p>
+              <p className="text-sm font-medium text-slate-500">Overdue</p>
 
               <h2 className="mt-2 text-2xl font-bold text-red-600">
-                {formatAmount(
-                  dashboard?.overdueAmount
-                )}
+                {formatAmount(dashboard?.overdueAmount)}
               </h2>
 
-              <p className="mt-1 text-sm text-slate-500">
-                {dashboard?.overdueCount || 0} overdue
-              </p>
-
+              <p className="mt-1 text-sm text-slate-500">{dashboard?.overdueCount || 0} overdue</p>
             </div>
-
           </div>
-
         </section>
 
         {/* =================================================
@@ -967,29 +935,20 @@ const MaintenanceDashboardPage = () => {
         ================================================= */}
 
         <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_14px_45px_-28px_rgba(15,23,42,0.3)]">
-
           <div className="flex flex-col gap-4 border-b border-slate-200 p-6 md:flex-row md:items-center md:justify-between">
-
             <div>
               <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">
                 Billing
               </p>
 
-              <h2 className="mt-1 text-xl font-bold text-slate-950">
-                Monthly Bills
-              </h2>
+              <h2 className="mt-1 text-xl font-bold text-slate-950">Monthly Bills</h2>
 
-              <p className="mt-1 text-sm text-slate-500">
-                Bills for {month}
-              </p>
+              <p className="mt-1 text-sm text-slate-500">Bills for {month}</p>
             </div>
 
             <div className="flex flex-wrap gap-2">
-
               <button
-                onClick={
-                  handleMarkOverdue
-                }
+                onClick={handleMarkOverdue}
                 className="rounded-xl border border-red-200 bg-white px-4 py-2.5 text-sm font-semibold text-red-600 transition hover:bg-red-50"
               >
                 Mark Overdue
@@ -1000,33 +959,24 @@ const MaintenanceDashboardPage = () => {
                   setGenerateForm({
                     month,
                     dueDate: "",
-                    defaultMaintenanceAmount: "",
                     lateFee: ""
                   });
 
-                  setShowGenerateModal(
-                    true
-                  );
+                  setShowGenerateModal(true);
                 }}
                 className="rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800"
               >
                 Generate Bills
               </button>
-
             </div>
-
           </div>
 
           {/* BILLS TABLE */}
 
           <div className="overflow-x-auto">
-
             <table className="min-w-full">
-
               <thead className="bg-slate-50">
-
                 <tr>
-
                   <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                     Flat
                   </th>
@@ -1051,7 +1001,6 @@ const MaintenanceDashboardPage = () => {
                     Status
                   </th>
 
-                  {/* NEW */}
                   <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                     Adjustment Reason
                   </th>
@@ -1059,392 +1008,226 @@ const MaintenanceDashboardPage = () => {
                   <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                     Action
                   </th>
-
                 </tr>
-
               </thead>
 
               <tbody className="divide-y divide-slate-200">
-
                 {bills.length === 0 ? (
-
                   <tr>
-
-                    <td
-                      colSpan="8"
-                      className="px-5 py-12 text-center text-sm text-slate-500"
-                    >
+                    <td colSpan="8" className="px-5 py-12 text-center text-sm text-slate-500">
                       No bills found for {month}.
                     </td>
-
                   </tr>
-
                 ) : (
+                  bills.map((bill) => {
+                    const billId = getBillId(bill);
 
-                  bills.map(
-                    (bill) => {
+                    return (
+                      <tr key={billId} className="transition hover:bg-slate-50">
+                        <td className="px-5 py-4 font-semibold text-slate-900">
+                          {getFlatNumber(bill)}
+                        </td>
 
-                      const billId =
-                        getBillId(
-                          bill
-                        );
+                        <td className="px-5 py-4 text-sm text-slate-700">
+                          {formatAmount(bill.maintenanceAmount)}
+                        </td>
 
-                      return (
+                        <td className="px-5 py-4 text-sm text-slate-700">
+                          {formatAmount(bill.lateFee)}
+                        </td>
 
-                        <tr
-                          key={billId}
-                          className="transition hover:bg-slate-50"
-                        >
+                        <td className="px-5 py-4 font-bold text-slate-900">
+                          {formatAmount(bill.totalAmount)}
+                        </td>
 
-                          <td className="px-5 py-4 font-semibold text-slate-900">
-                            {getFlatNumber(
-                              bill
+                        <td className="px-5 py-4 text-sm text-slate-700">
+                          {formatDate(bill.dueDate)}
+                        </td>
+
+                        <td className="px-5 py-4">
+                          <span
+                            className={`rounded-full px-3 py-1 text-xs font-semibold ${getStatusClasses(
+                              bill.status
+                            )}`}
+                          >
+                            {bill.status}
+                          </span>
+                        </td>
+
+                        <td className="max-w-xs px-5 py-4 text-sm text-slate-700">
+                          {bill.adjustmentReason || "No adjustment"}
+                        </td>
+
+                        <td className="px-5 py-4">
+                          <div className="flex flex-wrap gap-2">
+                            {bill.status !== "PAID" && (
+                              <button
+                                onClick={() => openEditModal(bill)}
+                                className="rounded-lg border border-blue-200 px-3 py-1.5 text-sm font-medium text-blue-600 hover:bg-blue-50"
+                              >
+                                Edit
+                              </button>
                             )}
-                          </td>
 
-                          <td className="px-5 py-4 text-sm text-slate-700">
-                            {formatAmount(
-                              bill.maintenanceAmount
+                            {bill.status !== "PAID" && (
+                              <button
+                                onClick={() => openOfflinePaymentModal(bill)}
+                                className="rounded-lg border border-green-200 px-3 py-1.5 text-sm font-medium text-green-600 hover:bg-green-50"
+                              >
+                                Record Payment
+                              </button>
                             )}
-                          </td>
-
-                          <td className="px-5 py-4 text-sm text-slate-700">
-                            {formatAmount(
-                              bill.lateFee
-                            )}
-                          </td>
-
-                          <td className="px-5 py-4 font-bold text-slate-900">
-                            {formatAmount(
-                              bill.totalAmount
-                            )}
-                          </td>
-
-                          <td className="px-5 py-4 text-sm text-slate-700">
-                            {formatDate(
-                              bill.dueDate
-                            )}
-                          </td>
-
-                          <td className="px-5 py-4">
-
-                            <span
-                              className={`rounded-full px-3 py-1 text-xs font-semibold ${getStatusClasses(
-                                bill.status
-                              )}`}
-                            >
-                              {bill.status}
-                            </span>
-
-                          </td>
-
-                          {/* NEW */}
-                          <td className="max-w-xs px-5 py-4 text-sm text-slate-700">
-                            {bill.adjustmentReason ||
-                              "No adjustment"}
-                          </td>
-
-                          <td className="px-5 py-4">
-
-                            <div className="flex flex-wrap gap-2">
-
-                              {bill.status !==
-                                "PAID" && (
-
-                                <button
-                                  onClick={() =>
-                                    openEditModal(
-                                      bill
-                                    )
-                                  }
-                                  className="rounded-lg border border-blue-200 px-3 py-1.5 text-sm font-medium text-blue-600 hover:bg-blue-50"
-                                >
-                                  Edit
-                                </button>
-
-                              )}
-
-                              {bill.status !==
-                                "PAID" && (
-
-                                <button
-                                  onClick={() =>
-                                    openOfflinePaymentModal(
-                                      bill
-                                    )
-                                  }
-                                  className="rounded-lg border border-green-200 px-3 py-1.5 text-sm font-medium text-green-600 hover:bg-green-50"
-                                >
-                                  Record Payment
-                                </button>
-
-                              )}
-
-                            </div>
-
-                          </td>
-
-                        </tr>
-
-                      );
-                    }
-                  )
-
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
-
               </tbody>
-
             </table>
-
           </div>
-
         </section>
-                {/* =================================================
+
+        {/* =================================================
             REPORTS
         ================================================= */}
 
         <section>
-
           <div className="mb-4">
-
             <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">
               Analytics
             </p>
 
-            <h2 className="mt-1 text-xl font-bold text-slate-950">
-              Reports
-            </h2>
+            <h2 className="mt-1 text-xl font-bold text-slate-950">Reports</h2>
 
-            <p className="mt-1 text-sm text-slate-500">
-              Maintenance report for {month}
-            </p>
-
+            <p className="mt-1 text-sm text-slate-500">Maintenance report for {month}</p>
           </div>
 
           {/* COLLECTION SUMMARY */}
 
           <div className="mb-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-
             <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_14px_45px_-28px_rgba(15,23,42,0.3)]">
-
-              <p className="text-sm text-slate-500">
-                Expected Collection
-              </p>
+              <p className="text-sm text-slate-500">Expected Collection</p>
 
               <h3 className="mt-2 text-2xl font-bold text-slate-950">
-                {formatAmount(
-                  dashboard?.expectedAmount
-                )}
+                {formatAmount(dashboard?.expectedAmount)}
               </h3>
-
             </div>
 
             <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_14px_45px_-28px_rgba(15,23,42,0.3)]">
-
-              <p className="text-sm text-slate-500">
-                Collected
-              </p>
+              <p className="text-sm text-slate-500">Collected</p>
 
               <h3 className="mt-2 text-2xl font-bold text-green-600">
-                {formatAmount(
-                  dashboard?.collectedAmount
-                )}
+                {formatAmount(dashboard?.collectedAmount)}
               </h3>
-
             </div>
 
             <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_14px_45px_-28px_rgba(15,23,42,0.3)]">
-
-              <p className="text-sm text-slate-500">
-                Outstanding
-              </p>
+              <p className="text-sm text-slate-500">Outstanding</p>
 
               <h3 className="mt-2 text-2xl font-bold text-orange-600">
-                {formatAmount(
-                  outstandingAmount
-                )}
+                {formatAmount(outstandingAmount)}
               </h3>
 
-              <p className="mt-1 text-sm text-slate-500">
-                Pending + Overdue
-              </p>
-
+              <p className="mt-1 text-sm text-slate-500">Pending + Overdue</p>
             </div>
 
             <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_14px_45px_-28px_rgba(15,23,42,0.3)]">
+              <p className="text-sm text-slate-500">Successful Payments</p>
 
-              <p className="text-sm text-slate-500">
-                Successful Payments
-              </p>
-
-              <h3 className="mt-2 text-2xl font-bold text-blue-600">
-                {successfulPayments}
-              </h3>
-
+              <h3 className="mt-2 text-2xl font-bold text-blue-600">{successfulPayments}</h3>
             </div>
-
           </div>
 
           {/* BILL STATUS + PAYMENT METHODS */}
 
           <div className="grid gap-6 lg:grid-cols-2">
-
             {/* BILL STATUS */}
 
             <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_14px_45px_-28px_rgba(15,23,42,0.3)]">
-
-              <h3 className="mb-5 text-lg font-bold text-slate-950">
-                Bill Status
-              </h3>
+              <h3 className="mb-5 text-lg font-bold text-slate-950">Bill Status</h3>
 
               <div className="space-y-4">
-
                 <div className="flex items-center justify-between">
+                  <span className="text-slate-600">Paid Bills</span>
 
-                  <span className="text-slate-600">
-                    Paid Bills
-                  </span>
-
-                  <span className="font-semibold text-green-600">
-                    {paidBills}
-                  </span>
-
+                  <span className="font-semibold text-green-600">{paidBills}</span>
                 </div>
 
                 <div className="flex items-center justify-between">
+                  <span className="text-slate-600">Pending Bills</span>
 
-                  <span className="text-slate-600">
-                    Pending Bills
-                  </span>
-
-                  <span className="font-semibold text-yellow-600">
-                    {pendingBills}
-                  </span>
-
+                  <span className="font-semibold text-yellow-600">{pendingBills}</span>
                 </div>
 
                 <div className="flex items-center justify-between">
+                  <span className="text-slate-600">Overdue Bills</span>
 
-                  <span className="text-slate-600">
-                    Overdue Bills
-                  </span>
-
-                  <span className="font-semibold text-red-600">
-                    {overdueBills}
-                  </span>
-
+                  <span className="font-semibold text-red-600">{overdueBills}</span>
                 </div>
 
                 <div className="border-t border-slate-100 pt-4">
-
                   <div className="flex items-center justify-between">
+                    <span className="font-semibold text-slate-900">Total Bills</span>
 
-                    <span className="font-semibold text-slate-900">
-                      Total Bills
-                    </span>
-
-                    <span className="font-bold text-slate-950">
-                      {bills.length}
-                    </span>
-
+                    <span className="font-bold text-slate-950">{bills.length}</span>
                   </div>
-
                 </div>
-
               </div>
-
             </div>
 
             {/* PAYMENT METHODS */}
 
             <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_14px_45px_-28px_rgba(15,23,42,0.3)]">
-
               <h3 className="mb-5 text-lg font-bold text-slate-950">
                 Collection by Payment Method
               </h3>
 
               <div className="space-y-4">
-
                 <div className="flex items-center justify-between">
-
-                  <span className="text-slate-600">
-                    Razorpay
-                  </span>
+                  <span className="text-slate-600">Razorpay</span>
 
                   <span className="font-semibold text-slate-900">
-                    {formatAmount(
-                      paymentMethodTotals.RAZORPAY
-                    )}
+                    {formatAmount(paymentMethodTotals.RAZORPAY)}
                   </span>
-
                 </div>
 
                 <div className="flex items-center justify-between">
-
-                  <span className="text-slate-600">
-                    Cash
-                  </span>
+                  <span className="text-slate-600">Cash</span>
 
                   <span className="font-semibold text-slate-900">
-                    {formatAmount(
-                      paymentMethodTotals.CASH
-                    )}
+                    {formatAmount(paymentMethodTotals.CASH)}
                   </span>
-
                 </div>
 
                 <div className="flex items-center justify-between">
-
-                  <span className="text-slate-600">
-                    UPI
-                  </span>
+                  <span className="text-slate-600">UPI</span>
 
                   <span className="font-semibold text-slate-900">
-                    {formatAmount(
-                      paymentMethodTotals.UPI
-                    )}
+                    {formatAmount(paymentMethodTotals.UPI)}
                   </span>
-
                 </div>
 
                 <div className="flex items-center justify-between">
-
-                  <span className="text-slate-600">
-                    Bank Transfer
-                  </span>
+                  <span className="text-slate-600">Bank Transfer</span>
 
                   <span className="font-semibold text-slate-900">
-                    {formatAmount(
-                      paymentMethodTotals.BANK_TRANSFER
-                    )}
+                    {formatAmount(paymentMethodTotals.BANK_TRANSFER)}
                   </span>
-
                 </div>
 
                 <div className="border-t border-slate-100 pt-4">
-
                   <div className="flex items-center justify-between">
-
-                    <span className="font-semibold text-slate-900">
-                      Total Collected
-                    </span>
+                    <span className="font-semibold text-slate-900">Total Collected</span>
 
                     <span className="font-bold text-green-600">
-                      {formatAmount(
-                        dashboard?.collectedAmount
-                      )}
+                      {formatAmount(dashboard?.collectedAmount)}
                     </span>
-
                   </div>
-
                 </div>
-
               </div>
-
             </div>
-
           </div>
-
         </section>
 
         {/* =================================================
@@ -1452,44 +1235,29 @@ const MaintenanceDashboardPage = () => {
         ================================================= */}
 
         <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_14px_45px_-28px_rgba(15,23,42,0.3)]">
-
           <div className="flex flex-col gap-4 border-b border-slate-200 p-6 md:flex-row md:items-center md:justify-between">
-
             <div>
-
               <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">
                 Transactions
               </p>
 
-              <h2 className="mt-1 text-xl font-bold text-slate-950">
-                Payment History
-              </h2>
+              <h2 className="mt-1 text-xl font-bold text-slate-950">Payment History</h2>
 
-              <p className="mt-1 text-sm text-slate-500">
-                Society-wide payments for {month}
-              </p>
-
+              <p className="mt-1 text-sm text-slate-500">Society-wide payments for {month}</p>
             </div>
 
             <button
-              onClick={() =>
-                openOfflinePaymentModal()
-              }
+              onClick={() => openOfflinePaymentModal()}
               className="rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800"
             >
               Record Offline Payment
             </button>
-
           </div>
 
           <div className="overflow-x-auto">
-
             <table className="min-w-full">
-
               <thead className="bg-slate-50">
-
                 <tr>
-
                   <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                     Flat
                   </th>
@@ -1517,255 +1285,188 @@ const MaintenanceDashboardPage = () => {
                   <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                     Receipt
                   </th>
-
                 </tr>
-
               </thead>
 
               <tbody className="divide-y divide-slate-200">
-
                 {payments.length === 0 ? (
-
                   <tr>
-
-                    <td
-                      colSpan="7"
-                      className="px-5 py-12 text-center text-sm text-slate-500"
-                    >
+                    <td colSpan="7" className="px-5 py-12 text-center text-sm text-slate-500">
                       No payments found for {month}.
                     </td>
-
                   </tr>
-
                 ) : (
+                  payments.map((payment) => (
+                    <tr key={payment?._id || payment?.id} className="hover:bg-slate-50">
+                      <td className="px-5 py-4 font-semibold text-slate-900">
+                        {getPaymentFlatNumber(payment)}
+                      </td>
 
-                  payments.map(
-                    (payment) => (
+                      <td className="px-5 py-4 text-sm text-slate-700">
+                        {getPaymentMonth(payment)}
+                      </td>
 
-                      <tr
-                        key={
-                          payment?._id ||
-                          payment?.id
-                        }
-                        className="hover:bg-slate-50"
-                      >
+                      <td className="px-5 py-4 font-semibold text-slate-900">
+                        {formatAmount(payment.amount)}
+                      </td>
 
-                        <td className="px-5 py-4 font-semibold text-slate-900">
-                          {getPaymentFlatNumber(
-                            payment
-                          )}
-                        </td>
+                      <td className="px-5 py-4 text-sm text-slate-700">
+                        {payment.paymentMethod || "N/A"}
+                      </td>
 
-                        <td className="px-5 py-4 text-sm text-slate-700">
-                          {getPaymentMonth(
-                            payment
-                          )}
-                        </td>
+                      <td className="px-5 py-4 text-sm text-slate-700">
+                        {formatDate(payment.paymentDate)}
+                      </td>
 
-                        <td className="px-5 py-4 font-semibold text-slate-900">
-                          {formatAmount(
-                            payment.amount
-                          )}
-                        </td>
-
-                        <td className="px-5 py-4 text-sm text-slate-700">
-                          {payment.paymentMethod ||
-                            "N/A"}
-                        </td>
-
-                        <td className="px-5 py-4 text-sm text-slate-700">
-                          {formatDate(
-                            payment.paymentDate
-                          )}
-                        </td>
-
-                        <td className="px-5 py-4">
-
-                          <span
-                            className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                              payment.status ===
-                              "SUCCESS"
-                                ? "bg-green-100 text-green-700"
-                                : payment.status ===
-                                  "FAILED"
+                      <td className="px-5 py-4">
+                        <span
+                          className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                            payment.status === "SUCCESS"
+                              ? "bg-green-100 text-green-700"
+                              : payment.status === "FAILED"
                                 ? "bg-red-100 text-red-700"
                                 : "bg-yellow-100 text-yellow-700"
-                            }`}
-                          >
-                            {payment.status}
-                          </span>
+                          }`}
+                        >
+                          {payment.status}
+                        </span>
+                      </td>
 
-                        </td>
-
-                        <td className="px-5 py-4 text-sm text-slate-700">
-                          {payment.receiptNumber ||
-                            "—"}
-                        </td>
-
-                      </tr>
-
-                    )
-                  )
-
+                      <td className="px-5 py-4 text-sm text-slate-700">
+                        {payment.receiptNumber || "—"}
+                      </td>
+                    </tr>
+                  ))
                 )}
-
               </tbody>
-
             </table>
-
           </div>
-
         </section>
-
       </div>
-
 
       {/* ===================================================
           GENERATE BILLS MODAL
       =================================================== */}
 
       {showGenerateModal && (
-
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-
           <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
-
             <div className="mb-5 flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-semibold text-gray-900">Generate Monthly Bills</h2>
 
-              <h2 className="text-xl font-semibold text-gray-900">
-                Generate Monthly Bills
-              </h2>
+                <p className="mt-1 text-sm text-gray-500">
+                  Bills will use the configured flat-type rates.
+                </p>
+              </div>
 
               <button
                 type="button"
-                onClick={() =>
-                  setShowGenerateModal(
-                    false
-                  )
-                }
+                onClick={() => setShowGenerateModal(false)}
                 className="text-2xl text-gray-400 hover:text-gray-700"
               >
                 ×
               </button>
-
             </div>
 
-            <form
-              onSubmit={
-                handleGenerateBills
-              }
-              className="space-y-4"
-            >
+            <form onSubmit={handleGenerateBills} className="space-y-4">
+              {/* MONTH */}
 
               <div>
-
-                <label className="mb-1 block text-sm font-medium text-gray-700">
-                  Month
-                </label>
+                <label className="mb-1 block text-sm font-medium text-gray-700">Month</label>
 
                 <input
                   type="month"
                   required
-                  value={
-                    generateForm.month
-                  }
+                  value={generateForm.month}
                   onChange={(e) =>
                     setGenerateForm({
                       ...generateForm,
-                      month:
-                        e.target.value
+                      month: e.target.value
                     })
                   }
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-blue-500"
                 />
-
               </div>
 
-              <div>
+              {/* DUE DATE */}
 
-                <label className="mb-1 block text-sm font-medium text-gray-700">
-                  Due Date
-                </label>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">Due Date</label>
 
                 <input
                   type="date"
                   required
-                  value={
-                    generateForm.dueDate
-                  }
+                  value={generateForm.dueDate}
                   onChange={(e) =>
                     setGenerateForm({
                       ...generateForm,
-                      dueDate:
-                        e.target.value
+                      dueDate: e.target.value
                     })
                   }
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-blue-500"
                 />
-
               </div>
 
-              <div>
+              {/* RATE INFORMATION */}
 
-                <label className="mb-1 block text-sm font-medium text-gray-700">
-                  Default Maintenance Amount
-                </label>
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <p className="mb-3 text-sm font-semibold text-slate-900">
+                  Current Maintenance Rates
+                </p>
+
+                <div className="grid grid-cols-2 gap-2">
+                  {FLAT_TYPES.map((flatType) => (
+                    <div
+                      key={flatType}
+                      className="flex items-center justify-between rounded-lg bg-white px-3 py-2"
+                    >
+                      <span className="text-sm font-medium text-slate-600">{flatType}</span>
+
+                      <span className="text-sm font-semibold text-slate-900">
+                        {maintenanceRates[flatType] !== undefined
+                          ? formatAmount(maintenanceRates[flatType])
+                          : "Not set"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                <p className="mt-3 text-xs text-slate-500">
+                  Only occupied flats with a configured rate will receive a monthly bill.
+                </p>
+              </div>
+
+              {/* LATE FEE */}
+
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">Late Fee</label>
 
                 <input
                   type="number"
                   min="0"
-                  required
-                  value={
-                    generateForm
-                      .defaultMaintenanceAmount
-                  }
+                  value={generateForm.lateFee}
                   onChange={(e) =>
                     setGenerateForm({
                       ...generateForm,
-                      defaultMaintenanceAmount:
-                        e.target.value
-                    })
-                  }
-                  placeholder="2500"
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-blue-500"
-                />
-
-              </div>
-
-              <div>
-
-                <label className="mb-1 block text-sm font-medium text-gray-700">
-                  Late Fee
-                </label>
-
-                <input
-                  type="number"
-                  min="0"
-                  value={
-                    generateForm.lateFee
-                  }
-                  onChange={(e) =>
-                    setGenerateForm({
-                      ...generateForm,
-                      lateFee:
-                        e.target.value
+                      lateFee: e.target.value
                     })
                   }
                   placeholder="100"
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-blue-500"
                 />
 
+                <p className="mt-1 text-xs text-gray-500">
+                  Late fee is added only when a bill becomes overdue.
+                </p>
               </div>
 
-              <div className="flex justify-end gap-3 pt-3">
+              {/* BUTTONS */}
 
+              <div className="flex justify-end gap-3 pt-3">
                 <button
                   type="button"
-                  onClick={() =>
-                    setShowGenerateModal(
-                      false
-                    )
-                  }
+                  onClick={() => setShowGenerateModal(false)}
                   className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
                 >
                   Cancel
@@ -1777,57 +1478,35 @@ const MaintenanceDashboardPage = () => {
                 >
                   Generate
                 </button>
-
               </div>
-
             </form>
-
           </div>
-
         </div>
-
       )}
-
 
       {/* ===================================================
           EDIT BILL MODAL
       =================================================== */}
 
       {showEditModal && (
-
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-
           <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl">
-
             <div className="mb-5 flex items-center justify-between">
-
-              <h2 className="text-xl font-semibold text-gray-900">
-                Edit Maintenance Bill
-              </h2>
+              <h2 className="text-xl font-semibold text-gray-900">Edit Maintenance Bill</h2>
 
               <button
                 type="button"
-                onClick={() =>
-                  setShowEditModal(
-                    false
-                  )
-                }
+                onClick={() => setShowEditModal(false)}
                 className="text-2xl text-gray-400 hover:text-gray-700"
               >
                 ×
               </button>
-
             </div>
 
-            <form
-              onSubmit={
-                handleUpdateBill
-              }
-              className="space-y-4"
-            >
+            <form onSubmit={handleUpdateBill} className="space-y-4">
+              {/* MAINTENANCE AMOUNT */}
 
               <div>
-
                 <label className="mb-1 block text-sm font-medium text-gray-700">
                   Maintenance Amount
                 </label>
@@ -1836,91 +1515,71 @@ const MaintenanceDashboardPage = () => {
                   type="number"
                   min="0"
                   required
-                  value={
-                    editForm
-                      .maintenanceAmount
-                  }
+                  value={editForm.maintenanceAmount}
                   onChange={(e) =>
                     setEditForm({
                       ...editForm,
-                      maintenanceAmount:
-                        e.target.value
+                      maintenanceAmount: e.target.value
                     })
                   }
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-blue-500"
                 />
-
               </div>
 
-              <div>
+              {/* DUE DATE */}
 
-                <label className="mb-1 block text-sm font-medium text-gray-700">
-                  Due Date
-                </label>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">Due Date</label>
 
                 <input
                   type="date"
                   required
-                  value={
-                    editForm.dueDate
-                  }
+                  value={editForm.dueDate}
                   onChange={(e) =>
                     setEditForm({
                       ...editForm,
-                      dueDate:
-                        e.target.value
+                      dueDate: e.target.value
                     })
                   }
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-blue-500"
                 />
-
               </div>
 
-              <div>
+              {/* LATE FEE */}
 
-                <label className="mb-1 block text-sm font-medium text-gray-700">
-                  Late Fee
-                </label>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">Late Fee</label>
 
                 <input
                   type="number"
                   min="0"
-                  value={
-                    editForm.lateFee
-                  }
+                  value={editForm.lateFee}
                   onChange={(e) =>
                     setEditForm({
                       ...editForm,
-                      lateFee:
-                        e.target.value
+                      lateFee: e.target.value
                     })
                   }
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-blue-500"
                 />
-
               </div>
 
-              <div>
+              {/* ADJUSTMENT REASON */}
 
+              <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700">
                   Adjustment Reason
-                  <span className="ml-1 text-red-500">
-                    *
-                  </span>
+                  <span className="ml-1 text-red-500">*</span>
                 </label>
 
                 <textarea
                   rows="3"
                   required
-                  value={
-                    editForm
-                      .adjustmentReason
-                  }
+                  value={editForm.adjustmentReason}
                   onChange={(e) =>
                     setEditForm({
                       ...editForm,
-                      adjustmentReason:
-                        e.target.value
+                      adjustmentReason: e.target.value
                     })
                   }
                   placeholder="Reason for changing the bill"
@@ -1930,18 +1589,14 @@ const MaintenanceDashboardPage = () => {
                 <p className="mt-1 text-xs text-gray-500">
                   Adjustment reason is required when editing a bill.
                 </p>
-
               </div>
 
-              <div className="flex justify-end gap-3 pt-3">
+              {/* BUTTONS */}
 
+              <div className="flex justify-end gap-3 pt-3">
                 <button
                   type="button"
-                  onClick={() =>
-                    setShowEditModal(
-                      false
-                    )
-                  }
+                  onClick={() => setShowEditModal(false)}
                   className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
                 >
                   Cancel
@@ -1953,252 +1608,156 @@ const MaintenanceDashboardPage = () => {
                 >
                   Save Changes
                 </button>
-
               </div>
-
             </form>
-
           </div>
-
         </div>
-
       )}
-
 
       {/* ===================================================
           OFFLINE PAYMENT MODAL
       =================================================== */}
 
       {showOfflineModal && (
-
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-
           <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl">
-
             <div className="mb-5 flex items-center justify-between">
-
-              <h2 className="text-xl font-semibold text-gray-900">
-                Record Offline Payment
-              </h2>
+              <h2 className="text-xl font-semibold text-gray-900">Record Offline Payment</h2>
 
               <button
                 type="button"
-                onClick={() =>
-                  setShowOfflineModal(
-                    false
-                  )
-                }
+                onClick={() => setShowOfflineModal(false)}
                 className="text-2xl text-gray-400 hover:text-gray-700"
               >
                 ×
               </button>
-
             </div>
 
-            <form
-              onSubmit={
-                handleOfflinePayment
-              }
-              className="space-y-4"
-            >
+            <form onSubmit={handleOfflinePayment} className="space-y-4">
+              {/* BILL */}
 
               <div>
-
-                <label className="mb-1 block text-sm font-medium text-gray-700">
-                  Bill
-                </label>
+                <label className="mb-1 block text-sm font-medium text-gray-700">Bill</label>
 
                 <select
                   required
-                  value={
-                    offlineForm.billId
-                  }
+                  value={offlineForm.billId}
                   onChange={(e) => {
-
-                    const selectedBill =
-                      bills.find(
-                        (bill) =>
-                          getBillId(
-                            bill
-                          ) ===
-                          e.target.value
-                      );
+                    const selectedBill = bills.find((bill) => getBillId(bill) === e.target.value);
 
                     setOfflineForm({
                       ...offlineForm,
 
-                      billId:
-                        e.target.value,
+                      billId: e.target.value,
 
-                      amount:
-                        selectedBill
-                          ? selectedBill.totalAmount
-                          : offlineForm.amount
+                      amount: selectedBill ? selectedBill.totalAmount : offlineForm.amount
                     });
-
                   }}
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-blue-500"
                 >
-
-                  <option value="">
-                    Select Bill
-                  </option>
+                  <option value="">Select Bill</option>
 
                   {bills
-                    .filter(
-                      (bill) =>
-                        bill.status !==
-                        "PAID"
-                    )
-                    .map(
-                      (bill) => (
-
-                        <option
-                          key={
-                            getBillId(
-                              bill
-                            )
-                          }
-                          value={
-                            getBillId(
-                              bill
-                            )
-                          }
-                        >
-                          {getFlatNumber(
-                            bill
-                          )}{" "}
-                          -{" "}
-                          {formatAmount(
-                            bill.totalAmount
-                          )}
-                        </option>
-
-                      )
-                    )}
-
+                    .filter((bill) => bill.status !== "PAID")
+                    .map((bill) => (
+                      <option key={getBillId(bill)} value={getBillId(bill)}>
+                        {getFlatNumber(bill)} - {formatAmount(bill.totalAmount)}
+                      </option>
+                    ))}
                 </select>
-
               </div>
 
-              <div>
+              {/* AMOUNT */}
 
-                <label className="mb-1 block text-sm font-medium text-gray-700">
-                  Amount
-                </label>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">Amount</label>
 
                 <input
                   type="number"
                   min="0"
                   required
-                  value={
-                    offlineForm.amount
-                  }
+                  value={offlineForm.amount}
                   onChange={(e) =>
                     setOfflineForm({
                       ...offlineForm,
-                      amount:
-                        e.target.value
+                      amount: e.target.value
                     })
                   }
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-blue-500"
                 />
-
               </div>
 
-              <div>
+              {/* PAYMENT METHOD */}
 
+              <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700">
                   Payment Method
                 </label>
 
                 <select
-                  value={
-                    offlineForm.paymentMethod
-                  }
+                  value={offlineForm.paymentMethod}
                   onChange={(e) =>
                     setOfflineForm({
                       ...offlineForm,
-                      paymentMethod:
-                        e.target.value
+                      paymentMethod: e.target.value
                     })
                   }
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-blue-500"
                 >
+                  <option value="CASH">Cash</option>
 
-                  <option value="CASH">
-                    Cash
-                  </option>
+                  <option value="UPI">UPI</option>
 
-                  <option value="UPI">
-                    UPI
-                  </option>
-
-                  <option value="BANK_TRANSFER">
-                    Bank Transfer
-                  </option>
-
+                  <option value="BANK_TRANSFER">Bank Transfer</option>
                 </select>
-
               </div>
 
-              <div>
+              {/* PAYMENT DATE */}
 
-                <label className="mb-1 block text-sm font-medium text-gray-700">
-                  Payment Date
-                </label>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">Payment Date</label>
 
                 <input
                   type="date"
                   required
-                  value={
-                    offlineForm.paymentDate
-                  }
+                  value={offlineForm.paymentDate}
                   onChange={(e) =>
                     setOfflineForm({
                       ...offlineForm,
-                      paymentDate:
-                        e.target.value
+                      paymentDate: e.target.value
                     })
                   }
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-blue-500"
                 />
-
               </div>
 
-              <div>
+              {/* TRANSACTION ID */}
 
+              <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700">
                   Transaction ID
                 </label>
 
                 <input
                   type="text"
-                  value={
-                    offlineForm.transactionId
-                  }
+                  value={offlineForm.transactionId}
                   onChange={(e) =>
                     setOfflineForm({
                       ...offlineForm,
-                      transactionId:
-                        e.target.value
+                      transactionId: e.target.value
                     })
                   }
                   placeholder="Optional"
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-blue-500"
                 />
-
               </div>
 
-              <div className="flex justify-end gap-3 pt-3">
+              {/* BUTTONS */}
 
+              <div className="flex justify-end gap-3 pt-3">
                 <button
                   type="button"
-                  onClick={() =>
-                    setShowOfflineModal(
-                      false
-                    )
-                  }
+                  onClick={() => setShowOfflineModal(false)}
                   className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
                 >
                   Cancel
@@ -2210,17 +1769,11 @@ const MaintenanceDashboardPage = () => {
                 >
                   Record Payment
                 </button>
-
               </div>
-
             </form>
-
           </div>
-
         </div>
-
       )}
-
     </AppShell>
   );
 };

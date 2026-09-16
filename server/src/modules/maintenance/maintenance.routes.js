@@ -1,16 +1,10 @@
 import express from "express";
 
-import authenticate
-  from "../../middleware/authentication.js";
+import authenticate from "../../middleware/authentication.js";
 
-import validate
-  from "../../middleware/validation.js";
+import validate from "../../middleware/validation.js";
 
-import {
-  requireSocietyMember,
-  requireSocietyRole
-} from "../../middleware/societyAuthorization.js";
-
+import { requireSocietyMember, requireSocietyRole } from "../../middleware/societyAuthorization.js";
 
 import {
   createBillSchema,
@@ -19,9 +13,9 @@ import {
   markOverdueSchema,
   offlinePaymentSchema,
   createPaymentOrderSchema,
-  verifyPaymentSchema
+  verifyPaymentSchema,
+  maintenanceRateSchema
 } from "./maintenance.validation.js";
-
 
 import {
   createBill,
@@ -38,19 +32,17 @@ import {
   getPaymentDetails,
   getDashboard,
   getTransparency,
+  getRates,
+  updateRate,
   createPaymentOrder,
   verifyPayment
 } from "./maintenance.controller.js";
 
-
-const router =
-  express.Router();
-
+const router = express.Router();
 
 // =====================================================
 // BILL ROUTES
 // =====================================================
-
 
 // -----------------------------------------------------
 // CREATE ONE BILL
@@ -58,22 +50,12 @@ const router =
 
 router.post(
   "/:societyId/bills",
-
   authenticate,
-
   requireSocietyMember,
-
-  requireSocietyRole(
-    "SECRETARY"
-  ),
-
-  validate(
-    createBillSchema
-  ),
-
+  requireSocietyRole("SECRETARY"),
+  validate(createBillSchema),
   createBill
 );
-
 
 // -----------------------------------------------------
 // GENERATE MONTHLY BILLS
@@ -81,22 +63,12 @@ router.post(
 
 router.post(
   "/:societyId/bills/generate",
-
   authenticate,
-
   requireSocietyMember,
-
-  requireSocietyRole(
-    "SECRETARY"
-  ),
-
-  validate(
-    generateBillsSchema
-  ),
-
+  requireSocietyRole("SECRETARY"),
+  validate(generateBillsSchema),
   generateBills
 );
-
 
 // -----------------------------------------------------
 // GET BILLS BY MONTH
@@ -104,18 +76,11 @@ router.post(
 
 router.get(
   "/:societyId/bills/month",
-
   authenticate,
-
   requireSocietyMember,
-
-  requireSocietyRole(
-    "SECRETARY"
-  ),
-
+  requireSocietyRole("SECRETARY"),
   getBillsByMonth
 );
-
 
 // -----------------------------------------------------
 // MARK BILLS OVERDUE
@@ -123,22 +88,12 @@ router.get(
 
 router.patch(
   "/:societyId/bills/overdue",
-
   authenticate,
-
   requireSocietyMember,
-
-  requireSocietyRole(
-    "SECRETARY"
-  ),
-
-  validate(
-    markOverdueSchema
-  ),
-
+  requireSocietyRole("SECRETARY"),
+  validate(markOverdueSchema),
   markOverdue
 );
-
 
 // -----------------------------------------------------
 // UPDATE BILL
@@ -146,42 +101,22 @@ router.patch(
 
 router.patch(
   "/:societyId/bills/:billId",
-
   authenticate,
-
   requireSocietyMember,
-
-  requireSocietyRole(
-    "SECRETARY"
-  ),
-
-  validate(
-    updateBillSchema
-  ),
-
+  requireSocietyRole("SECRETARY"),
+  validate(updateBillSchema),
   updateBill
 );
-
 
 // -----------------------------------------------------
 // GET PARTICULAR BILL
 // -----------------------------------------------------
 
-router.get(
-  "/:societyId/bills/:billId",
-
-  authenticate,
-
-  requireSocietyMember,
-
-  getBill
-);
-
+router.get("/:societyId/bills/:billId", authenticate, requireSocietyMember, getBill);
 
 // =====================================================
 // PAYMENT ROUTES
 // =====================================================
-
 
 // -----------------------------------------------------
 // RECORD OFFLINE PAYMENT
@@ -189,22 +124,12 @@ router.get(
 
 router.post(
   "/:societyId/payments/offline",
-
   authenticate,
-
   requireSocietyMember,
-
-  requireSocietyRole(
-    "SECRETARY"
-  ),
-
-  validate(
-    offlinePaymentSchema
-  ),
-
+  requireSocietyRole("SECRETARY"),
+  validate(offlinePaymentSchema),
   recordOffline
 );
-
 
 // -----------------------------------------------------
 // SOCIETY PAYMENT HISTORY
@@ -212,18 +137,11 @@ router.post(
 
 router.get(
   "/:societyId/payments",
-
   authenticate,
-
   requireSocietyMember,
-
-  requireSocietyRole(
-    "SECRETARY"
-  ),
-
+  requireSocietyRole("SECRETARY"),
   getSocietyPayments
 );
-
 
 // -----------------------------------------------------
 // PARTICULAR PAYMENT
@@ -231,14 +149,10 @@ router.get(
 
 router.get(
   "/:societyId/payments/:paymentId",
-
   authenticate,
-
   requireSocietyMember,
-
   getPaymentDetails
 );
-
 
 // =====================================================
 // DASHBOARD
@@ -246,88 +160,72 @@ router.get(
 
 router.get(
   "/:societyId/dashboard",
-
   authenticate,
-
   requireSocietyMember,
-
-  requireSocietyRole(
-    "SECRETARY"
-  ),
-
+  requireSocietyRole("SECRETARY"),
   getDashboard
 );
 
+// =====================================================
+// MAINTENANCE RATE ROUTES
+// =====================================================
+
+// -----------------------------------------------------
+// GET MAINTENANCE RATES
+// -----------------------------------------------------
+
+router.get(
+  "/:societyId/rates",
+  authenticate,
+  requireSocietyMember,
+  requireSocietyRole("SECRETARY"),
+  getRates
+);
+
+// -----------------------------------------------------
+// UPDATE MAINTENANCE RATE
+// -----------------------------------------------------
+
+router.patch(
+  "/:societyId/rates",
+  authenticate,
+  requireSocietyMember,
+  requireSocietyRole("SECRETARY"),
+  validate(maintenanceRateSchema),
+  updateRate
+);
 
 // =====================================================
 // RESIDENT ROUTES
 // =====================================================
 
-
 // -----------------------------------------------------
 // SOCIETY TRANSPARENCY
 // -----------------------------------------------------
 
-router.get(
-  "/:societyId/transparency",
-
-  authenticate,
-
-  requireSocietyMember,
-
-  getTransparency
-);
-
+router.get("/:societyId/transparency", authenticate, requireSocietyMember, getTransparency);
 
 // -----------------------------------------------------
 // CURRENT BILL
 // -----------------------------------------------------
 
-router.get(
-  "/:societyId/current",
-
-  authenticate,
-
-  requireSocietyMember,
-
-  getCurrentBill
-);
-
+router.get("/:societyId/current", authenticate, requireSocietyMember, getCurrentBill);
 
 // -----------------------------------------------------
 // MAINTENANCE HISTORY
 // -----------------------------------------------------
 
-router.get(
-  "/:societyId/history",
-
-  authenticate,
-
-  requireSocietyMember,
-
-  getHistory
-);
-
+router.get("/:societyId/history", authenticate, requireSocietyMember, getHistory);
 
 // -----------------------------------------------------
 // MY PAYMENT HISTORY
 // -----------------------------------------------------
 
-router.get(
-  "/:societyId/my-payments",
-
-  authenticate,
-
-  requireSocietyMember,
-
-  getMyPaymentHistory
-);
-
+router.get("/:societyId/my-payments", authenticate, requireSocietyMember, getMyPaymentHistory);
 
 // =====================================================
 // RAZORPAY
 // =====================================================
-
 
 // -----------------------------------------------------
 // CREATE PAYMENT ORDER
@@ -335,18 +233,11 @@ router.get(
 
 router.post(
   "/:societyId/payment-order",
-
   authenticate,
-
   requireSocietyMember,
-
-  validate(
-    createPaymentOrderSchema
-  ),
-
+  validate(createPaymentOrderSchema),
   createPaymentOrder
 );
-
 
 // -----------------------------------------------------
 // VERIFY PAYMENT
@@ -354,17 +245,10 @@ router.post(
 
 router.post(
   "/:societyId/verify-payment",
-
   authenticate,
-
   requireSocietyMember,
-
-  validate(
-    verifyPaymentSchema
-  ),
-
+  validate(verifyPaymentSchema),
   verifyPayment
 );
-
 
 export default router;

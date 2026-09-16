@@ -1,388 +1,299 @@
 import MaintenanceBill from "../../models/MaintenanceBill.js";
 import MaintenancePayment from "../../models/MaintenancePayment.js";
 import Flat from "../../models/Flat.js";
-
+import MaintenanceRate from "./maintenanceRate.model.js";
 
 // =====================================================
 // CREATE BILL
 // =====================================================
 
 const createBill = async (data) => {
-
-  const bill =
-    await MaintenanceBill.create(data);
+  const bill = await MaintenanceBill.create(data);
 
   return bill;
 };
-
 
 // =====================================================
 // CREATE MULTIPLE BILLS
 // =====================================================
 
 const createBills = async (bills) => {
-
   if (!bills.length) {
     return [];
   }
 
-  const createdBills =
-    await MaintenanceBill.insertMany(
-      bills
-    );
+  const createdBills = await MaintenanceBill.insertMany(bills);
 
   return createdBills;
 };
-
 
 // =====================================================
 // FIND BILL BY ID
 // =====================================================
 
-const findBillById = async (
-  societyId,
-  billId
-) => {
-
-  const bill =
-    await MaintenanceBill.findOne({
-      _id: billId,
-      societyId
-    }).lean();
+const findBillById = async (societyId, billId) => {
+  const bill = await MaintenanceBill.findOne({
+    _id: billId,
+    societyId
+  }).lean();
 
   return bill;
 };
-
 
 // =====================================================
 // FIND BILL BY ID WITH DETAILS
 // =====================================================
 
-const findBillByIdWithDetails = async (
-  societyId,
-  billId
-) => {
-
-  const bill =
-    await MaintenanceBill.findOne({
-      _id: billId,
-      societyId
-    })
-      .populate(
-        "flatId",
-        "flatNumber floor wing"
-      )
-      .lean();
+const findBillByIdWithDetails = async (societyId, billId) => {
+  const bill = await MaintenanceBill.findOne({
+    _id: billId,
+    societyId
+  })
+    .populate("flatId", "flatNumber floor wing flatType")
+    .lean();
 
   return bill;
 };
-
 
 // =====================================================
 // FIND BILL BY FLAT AND MONTH
 // =====================================================
 
-const findBillByFlatAndMonth = async (
-  societyId,
-  flatId,
-  month
-) => {
-
-  const bill =
-    await MaintenanceBill.findOne({
-      societyId,
-      flatId,
-      month
-    }).lean();
+const findBillByFlatAndMonth = async (societyId, flatId, month) => {
+  const bill = await MaintenanceBill.findOne({
+    societyId,
+    flatId,
+    month
+  }).lean();
 
   return bill;
 };
-
 
 // =====================================================
 // FIND SOCIETY BILLS BY MONTH
 // =====================================================
 
-const findBillsBySocietyAndMonth = async (
-  societyId,
-  month
-) => {
-
-  const bills =
-    await MaintenanceBill.find({
-      societyId,
-      month
+const findBillsBySocietyAndMonth = async (societyId, month) => {
+  const bills = await MaintenanceBill.find({
+    societyId,
+    month
+  })
+    .populate("flatId", "flatNumber floor wing")
+    .sort({
+      createdAt: 1
     })
-      .populate(
-        "flatId",
-        "flatNumber floor wing"
-      )
-      .sort({
-        createdAt: 1
-      })
-      .lean();
+    .lean();
 
   return bills;
 };
-
 
 // =====================================================
 // FIND CURRENT BILL
 // =====================================================
 
-const findCurrentBill = async (
-  societyId,
-  flatId
-) => {
-
-  const bill =
-    await MaintenanceBill.findOne({
-      societyId,
-      flatId
+const findCurrentBill = async (societyId, flatId) => {
+  const bill = await MaintenanceBill.findOne({
+    societyId,
+    flatId
+  })
+    .sort({
+      month: -1
     })
-      .sort({
-        month: -1
-      })
-      .lean();
+    .lean();
 
   return bill;
 };
-
 
 // =====================================================
 // FIND BILLS BY FLAT
 // =====================================================
 
-const findBillsByFlat = async (
-  societyId,
-  flatId
-) => {
-
-  const bills =
-    await MaintenanceBill.find({
-      societyId,
-      flatId
+const findBillsByFlat = async (societyId, flatId) => {
+  const bills = await MaintenanceBill.find({
+    societyId,
+    flatId
+  })
+    .sort({
+      month: -1
     })
-      .sort({
-        month: -1
-      })
-      .lean();
+    .lean();
 
   return bills;
 };
-
 
 // =====================================================
 // UPDATE BILL
 // =====================================================
 
-const updateBill = async (
-  societyId,
-  billId,
-  updates
-) => {
-
-  const bill =
-    await MaintenanceBill.findOneAndUpdate(
-      {
-        _id: billId,
-        societyId
-      },
-      {
-        $set: updates
-      },
-      {
-        new: true,
-        runValidators: true
-      }
-    ).lean();
+const updateBill = async (societyId, billId, updates) => {
+  const bill = await MaintenanceBill.findOneAndUpdate(
+    {
+      _id: billId,
+      societyId
+    },
+    {
+      $set: updates
+    },
+    {
+      new: true,
+      runValidators: true
+    }
+  ).lean();
 
   return bill;
 };
-
 
 // =====================================================
 // UPDATE BILL STATUS
 // =====================================================
 
-const updateBillStatus = async (
-  societyId,
-  billId,
-  status,
-  totalAmount
-) => {
-
+const updateBillStatus = async (societyId, billId, status, totalAmount) => {
   const updateData = {
     status
   };
 
-  if (
-    typeof totalAmount === "number"
-  ) {
-    updateData.totalAmount =
-      totalAmount;
+  if (typeof totalAmount === "number") {
+    updateData.totalAmount = totalAmount;
   }
 
-  const bill =
-    await MaintenanceBill.findOneAndUpdate(
-      {
-        _id: billId,
-        societyId
-      },
-      {
-        $set: updateData
-      },
-      {
-        new: true,
-        runValidators: true
-      }
-    ).lean();
+  const bill = await MaintenanceBill.findOneAndUpdate(
+    {
+      _id: billId,
+      societyId
+    },
+    {
+      $set: updateData
+    },
+    {
+      new: true,
+      runValidators: true
+    }
+  ).lean();
 
   return bill;
 };
-
 
 // =====================================================
 // CREATE PAYMENT
 // =====================================================
 
-const createPayment = async (
-  data
-) => {
-
-  const payment =
-    await MaintenancePayment.create(
-      data
-    );
+const createPayment = async (data) => {
+  const payment = await MaintenancePayment.create(data);
 
   return payment;
 };
-
 
 // =====================================================
 // FIND PAYMENT BY ID
 // =====================================================
 
-const findPaymentById = async (
-  societyId,
-  paymentId
-) => {
-
-  const payment =
-    await MaintenancePayment.findOne({
-      _id: paymentId,
-      societyId
-    })
-      .populate(
-        "billId"
-      )
-      .populate(
-        "flatId",
-        "flatNumber floor wing"
-      )
-      .lean();
+const findPaymentById = async (societyId, paymentId) => {
+  const payment = await MaintenancePayment.findOne({
+    _id: paymentId,
+    societyId
+  })
+    .populate("billId")
+    .populate("flatId", "flatNumber floor wing")
+    .lean();
 
   return payment;
 };
-
 
 // =====================================================
 // FIND PAYMENT BY BILL ID
 // =====================================================
 
-const findPaymentByBillId = async (
-  societyId,
-  billId
-) => {
-
-  const payment =
-    await MaintenancePayment.findOne({
-      societyId,
-      billId
+const findPaymentByBillId = async (societyId, billId) => {
+  const payment = await MaintenancePayment.findOne({
+    societyId,
+    billId
+  })
+    .sort({
+      createdAt: -1
     })
-      .sort({
-        createdAt: -1
-      })
-      .lean();
+    .lean();
 
   return payment;
 };
 
+const findPaymentsByBillId = async (societyId, billId) => {
+  const payments = await MaintenancePayment.find({
+    societyId,
+    billId
+  })
+    .sort({
+      createdAt: -1
+    })
+    .lean();
+
+  return payments;
+};
+
+const findPendingRazorpayPaymentsByBillId = async (societyId, billId) => {
+  const payments = await MaintenancePayment.find({
+    societyId,
+    billId,
+    paymentMethod: "RAZORPAY",
+    status: "PENDING",
+    razorpayOrderId: {
+      $exists: true,
+      $ne: null
+    }
+  })
+    .sort({ createdAt: -1 })
+    .lean();
+
+  return payments;
+};
 
 // =====================================================
 // FIND PAYMENT BY RAZORPAY ORDER ID
 // =====================================================
 
-const findPaymentByRazorpayOrderId = async (
-  societyId,
-  razorpayOrderId
-) => {
-
-  const payment =
-    await MaintenancePayment.findOne({
-      societyId,
-      razorpayOrderId
-    }).lean();
+const findPaymentByRazorpayOrderId = async (societyId, razorpayOrderId) => {
+  const payment = await MaintenancePayment.findOne({
+    societyId,
+    razorpayOrderId
+  }).lean();
 
   return payment;
 };
-
 
 // =====================================================
 // FIND PAYMENTS BY FLAT
 // =====================================================
 
-const findPaymentsByFlat = async (
-  societyId,
-  flatId
-) => {
-
-  const payments =
-    await MaintenancePayment.find({
-      societyId,
-      flatId
+const findPaymentsByFlat = async (societyId, flatId) => {
+  const payments = await MaintenancePayment.find({
+    societyId,
+    flatId
+  })
+    .populate("billId")
+    .populate("flatId", "flatNumber floor wing")
+    .sort({
+      paymentDate: -1
     })
-      .populate(
-        "billId"
-      )
-      .populate(
-        "flatId",
-        "flatNumber floor wing"
-      )
-      .sort({
-        paymentDate: -1
-      })
-      .lean();
+    .lean();
 
   return payments;
 };
-
 
 // =====================================================
 // FIND PAYMENTS BY SOCIETY
 // =====================================================
 
-const findPaymentsBySociety = async (
-  societyId,
-  month
-) => {
-
+const findPaymentsBySociety = async (societyId, month) => {
   let billIds = null;
 
   if (month) {
+    const bills = await MaintenanceBill.find({
+      societyId,
+      month
+    })
+      .select("_id")
+      .lean();
 
-    const bills =
-      await MaintenanceBill.find({
-        societyId,
-        month
-      })
-        .select("_id")
-        .lean();
-
-    billIds =
-      bills.map(
-        (bill) => bill._id
-      );
+    billIds = bills.map((bill) => bill._id);
   }
 
   const query = {
@@ -395,145 +306,91 @@ const findPaymentsBySociety = async (
     };
   }
 
-  const payments =
-    await MaintenancePayment.find(
-      query
-    )
-      .populate(
-        "flatId",
-        "flatNumber floor wing"
-      )
-      .populate(
-        "billId"
-      )
-      .sort({
-        paymentDate: -1
-      })
-      .lean();
+  const payments = await MaintenancePayment.find(query)
+    .populate("flatId", "flatNumber floor wing")
+    .populate("billId")
+    .sort({
+      paymentDate: -1
+    })
+    .lean();
 
   return payments;
 };
-
 
 // =====================================================
 // UPDATE PAYMENT
 // =====================================================
 
-const updatePayment = async (
-  societyId,
-  paymentId,
-  updates
-) => {
-
-  const payment =
-    await MaintenancePayment.findOneAndUpdate(
-      {
-        _id: paymentId,
-        societyId
-      },
-      {
-        $set: updates
-      },
-      {
-        new: true,
-        runValidators: true
-      }
-    ).lean();
+const updatePayment = async (societyId, paymentId, updates) => {
+  const payment = await MaintenancePayment.findOneAndUpdate(
+    {
+      _id: paymentId,
+      societyId
+    },
+    {
+      $set: updates
+    },
+    {
+      new: true,
+      runValidators: true
+    }
+  ).lean();
 
   return payment;
 };
-
 
 // =====================================================
 // DASHBOARD STATISTICS
 // =====================================================
 
-const getDashboardStats = async (
-  societyId,
-  month
-) => {
-
-  const bills =
-    await MaintenanceBill.find({
-      societyId,
-      month
-    })
-      .select(
-        "maintenanceAmount totalAmount status"
-      )
-      .lean();
+const getDashboardStats = async (societyId, month) => {
+  const bills = await MaintenanceBill.find({
+    societyId,
+    month
+  })
+    .select("maintenanceAmount totalAmount status")
+    .lean();
 
   const stats = {
+    totalBills: bills.length,
 
-    totalBills:
-      bills.length,
+    expectedAmount: 0,
 
-    expectedAmount:
-      0,
+    collectedAmount: 0,
 
-    collectedAmount:
-      0,
+    pendingAmount: 0,
 
-    pendingAmount:
-      0,
+    overdueAmount: 0,
 
-    overdueAmount:
-      0,
+    paidCount: 0,
 
-    paidCount:
-      0,
+    pendingCount: 0,
 
-    pendingCount:
-      0,
-
-    overdueCount:
-      0
+    overdueCount: 0
   };
 
-
   for (const bill of bills) {
+    const amount = Number(bill.totalAmount || 0);
 
-    const amount =
-      Number(
-        bill.totalAmount || 0
-      );
+    stats.expectedAmount += amount;
 
-
-    stats.expectedAmount +=
-      amount;
-
-
-    if (
-      bill.status === "PAID"
-    ) {
-
-      stats.collectedAmount +=
-        amount;
+    if (bill.status === "PAID") {
+      stats.collectedAmount += amount;
 
       stats.paidCount += 1;
-
-    } else if (
-      bill.status === "OVERDUE"
-    ) {
-
-      stats.overdueAmount +=
-        amount;
+    } else if (bill.status === "OVERDUE") {
+      stats.overdueAmount += amount;
 
       stats.overdueCount += 1;
-
     } else {
-
-      stats.pendingAmount +=
-        amount;
+      stats.pendingAmount += amount;
 
       stats.pendingCount += 1;
     }
   }
 
-
   return stats;
 };
-
 
 // =====================================================
 // SOCIETY TRANSPARENCY
@@ -562,215 +419,135 @@ const getDashboardStats = async (
 // - NO_BILL
 // =====================================================
 
-const getTransparencyStats = async (
-  societyId,
-  month
-) => {
-
+const getTransparencyStats = async (societyId, month) => {
   // ---------------------------------------------------
   // Get ALL flats in the society
   // ---------------------------------------------------
 
-  const flats =
-    await Flat.find({
-      societyId
+  const flats = await Flat.find({
+    societyId
+  })
+    .select("_id flatNumber floor wing")
+    .sort({
+      flatNumber: 1
     })
-      .select(
-        "_id flatNumber floor wing"
-      )
-      .sort({
-        flatNumber: 1
-      })
-      .lean();
-
+    .lean();
 
   // ---------------------------------------------------
   // Get all bills for selected month
   // ---------------------------------------------------
 
-  const bills =
-    await MaintenanceBill.find({
-      societyId,
-      month
-    })
-      .select(
-        "_id flatId maintenanceAmount totalAmount status dueDate"
-      )
-      .lean();
-
+  const bills = await MaintenanceBill.find({
+    societyId,
+    month
+  })
+    .select("_id flatId maintenanceAmount totalAmount status dueDate")
+    .lean();
 
   // ---------------------------------------------------
   // Get successful payments for those bills
   // ---------------------------------------------------
 
-  const billIds =
-    bills.map(
-      (bill) => bill._id
-    );
-
+  const billIds = bills.map((bill) => bill._id);
 
   let payments = [];
 
-
   if (billIds.length > 0) {
+    payments = await MaintenancePayment.find({
+      societyId,
 
-    payments =
-      await MaintenancePayment.find({
-        societyId,
+      billId: {
+        $in: billIds
+      },
 
-        billId: {
-          $in: billIds
-        },
-
-        status: "SUCCESS"
+      status: "SUCCESS"
+    })
+      .select("billId paymentDate")
+      .sort({
+        paymentDate: -1
       })
-        .select(
-          "billId paymentDate"
-        )
-        .sort({
-          paymentDate: -1
-        })
-        .lean();
+      .lean();
   }
-
 
   // ---------------------------------------------------
   // Create quick lookup for bills
   // ---------------------------------------------------
 
-  const billMap =
-    new Map();
-
+  const billMap = new Map();
 
   for (const bill of bills) {
-
-    billMap.set(
-      bill.flatId.toString(),
-      bill
-    );
+    billMap.set(bill.flatId.toString(), bill);
   }
-
 
   // ---------------------------------------------------
   // Create quick lookup for payments
   // ---------------------------------------------------
 
-  const paymentMap =
-    new Map();
-
+  const paymentMap = new Map();
 
   for (const payment of payments) {
-
-    const billId =
-      payment.billId.toString();
-
+    const billId = payment.billId.toString();
 
     // Keep the latest successful
     // payment if there is more than one.
-    if (
-      !paymentMap.has(
-        billId
-      )
-    ) {
-
-      paymentMap.set(
-        billId,
-        payment
-      );
+    if (!paymentMap.has(billId)) {
+      paymentMap.set(billId, payment);
     }
   }
-
 
   // ---------------------------------------------------
   // Build transparency response
   // ---------------------------------------------------
 
-  const transparency =
-    flats.map(
-      (flat) => {
+  const transparency = flats.map((flat) => {
+    const flatId = flat._id.toString();
 
-        const flatId =
-          flat._id.toString();
+    const bill = billMap.get(flatId);
 
+    // ---------------------------------------------
+    // Flat has NO bill for selected month
+    // ---------------------------------------------
 
-        const bill =
-          billMap.get(
-            flatId
-          );
+    if (!bill) {
+      return {
+        flatId: flat._id,
 
+        flatNumber: flat.flatNumber,
 
-        // ---------------------------------------------
-        // Flat has NO bill for selected month
-        // ---------------------------------------------
+        floor: flat.floor,
 
-        if (!bill) {
+        wing: flat.wing,
 
-          return {
+        amount: null,
 
-            flatId:
-              flat._id,
+        status: "NO_BILL",
 
-            flatNumber:
-              flat.flatNumber,
+        paymentDate: null
+      };
+    }
 
-            floor:
-              flat.floor,
+    // ---------------------------------------------
+    // Flat has a bill
+    // ---------------------------------------------
 
-            wing:
-              flat.wing,
+    const payment = paymentMap.get(bill._id.toString());
 
-            amount:
-              null,
+    return {
+      flatId: flat._id,
 
-            status:
-              "NO_BILL",
+      flatNumber: flat.flatNumber,
 
-            paymentDate:
-              null
-          };
-        }
+      floor: flat.floor,
 
+      wing: flat.wing,
 
-        // ---------------------------------------------
-        // Flat has a bill
-        // ---------------------------------------------
+      amount: Number(bill.totalAmount || 0),
 
-        const payment =
-          paymentMap.get(
-            bill._id.toString()
-          );
+      status: bill.status,
 
-
-        return {
-
-          flatId:
-            flat._id,
-
-          flatNumber:
-            flat.flatNumber,
-
-          floor:
-            flat.floor,
-
-          wing:
-            flat.wing,
-
-          amount:
-            Number(
-              bill.totalAmount || 0
-            ),
-
-          status:
-            bill.status,
-
-          paymentDate:
-            payment
-              ? payment.paymentDate
-              : null
-        };
-      }
-    );
-
+      paymentDate: payment ? payment.paymentDate : null
+    };
+  });
 
   // ---------------------------------------------------
   // Return transparency data
@@ -779,48 +556,119 @@ const getTransparencyStats = async (
   return transparency;
 };
 
+// =====================================================
+// MAINTENANCE RATE FUNCTIONS
+// =====================================================
+
+const findMaintenanceRates = async (societyId) => {
+  const rates = await MaintenanceRate.find({
+    societyId
+  })
+    .sort({
+      flatType: 1
+    })
+    .lean();
+
+  return rates;
+};
+
+// =====================================================
+// FIND RATE BY FLAT TYPE
+// =====================================================
+
+const findMaintenanceRate = async (societyId, flatType) => {
+  const rate = await MaintenanceRate.findOne({
+    societyId,
+    flatType
+  }).lean();
+
+  return rate;
+};
+
+// =====================================================
+// CREATE / UPDATE RATE
+// =====================================================
+
+const upsertMaintenanceRate = async (societyId, flatType, amount) => {
+  const rate = await MaintenanceRate.findOneAndUpdate(
+    {
+      societyId,
+      flatType
+    },
+    {
+      $set: {
+        amount
+      }
+    },
+    {
+      new: true,
+      upsert: true,
+      runValidators: true,
+      setDefaultsOnInsert: true
+    }
+  ).lean();
+
+  return rate;
+};
+
+// =====================================================
+// GET RATE MAP
+// =====================================================
+//
+// Example:
+//
+// {
+//   "1RK": 800,
+//   "1BHK": 1000,
+//   "2BHK": 2000,
+//   "3BHK": 3000
+// }
+//
+
+const getMaintenanceRateMap = async (societyId) => {
+  const rates = await MaintenanceRate.find({
+    societyId
+  })
+    .select("flatType amount")
+    .lean();
+
+  const rateMap = {};
+
+  for (const rate of rates) {
+    rateMap[rate.flatType] = Number(rate.amount);
+  }
+
+  return rateMap;
+};
 
 // =====================================================
 // EXPORTS
 // =====================================================
 
 export {
-
   createBill,
-
   createBills,
-
   findBillById,
-
   findBillByIdWithDetails,
-
   findBillByFlatAndMonth,
-
   findBillsBySocietyAndMonth,
-
   findCurrentBill,
-
   findBillsByFlat,
-
   updateBill,
-
   updateBillStatus,
-
   createPayment,
-
   findPaymentById,
-
   findPaymentByBillId,
-
+  findPendingRazorpayPaymentsByBillId,
   findPaymentByRazorpayOrderId,
-
   findPaymentsByFlat,
-
   findPaymentsBySociety,
-
   updatePayment,
-
   getDashboardStats,
-
-  getTransparencyStats
+  getTransparencyStats,
+  findMaintenanceRates,
+  findMaintenanceRate,
+  upsertMaintenanceRate,
+  getMaintenanceRateMap,
+  findPaymentsByBillId
 };
