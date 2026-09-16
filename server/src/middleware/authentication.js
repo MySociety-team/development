@@ -1,6 +1,9 @@
 import User from "../models/User.js";
+
 import ApiError from "../utils/apiError.js";
+
 import asyncHandler from "../utils/asyncHandler.js";
+
 import { verifyJwt } from "../utils/jwt.js";
 
 const extractBearerToken = (authorizationHeader) => {
@@ -10,7 +13,11 @@ const extractBearerToken = (authorizationHeader) => {
 
   const parts = authorizationHeader.trim().split(/\s+/);
 
-  if (parts.length !== 2 || parts[0] !== "Bearer" || !parts[1]) {
+  if (
+    parts.length !== 2 ||
+    parts[0] !== "Bearer" ||
+    !parts[1]
+  ) {
     return null;
   }
 
@@ -21,7 +28,11 @@ const authenticate = asyncHandler(async (req, res, next) => {
   const authorizationHeader = req.get("Authorization");
 
   if (!authorizationHeader) {
-    throw new ApiError(401, "AUTH_TOKEN_REQUIRED", "Authentication token is required");
+    throw new ApiError(
+      401,
+      "AUTH_TOKEN_REQUIRED",
+      "Authentication token is required"
+    );
   }
 
   const token = extractBearerToken(authorizationHeader);
@@ -36,8 +47,16 @@ const authenticate = asyncHandler(async (req, res, next) => {
 
   const payload = verifyJwt(token);
 
-  if (!payload || typeof payload !== "object" || !payload.sub) {
-    throw new ApiError(401, "AUTH_TOKEN_INVALID", "Authentication token is invalid");
+  if (
+    !payload ||
+    typeof payload !== "object" ||
+    !payload.sub
+  ) {
+    throw new ApiError(
+      401,
+      "AUTH_TOKEN_INVALID",
+      "Authentication token is invalid"
+    );
   }
 
   const user = await User.findById(payload.sub)
@@ -64,4 +83,5 @@ const authenticate = asyncHandler(async (req, res, next) => {
 });
 
 export { extractBearerToken };
+
 export default authenticate;

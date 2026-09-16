@@ -1,10 +1,11 @@
 import mongoose from "mongoose";
+import crypto from "crypto";
+
 import ApiError from "../../utils/apiError.js";
-import Flat from "../../models/Flat.js";
+import getRazorpayClient from "../../config/razorpay.js";
 
 import {
   createBill,
-  findPaymentById,
   createBills,
   findBillById,
   findBillByIdWithDetails,
@@ -15,149 +16,340 @@ import {
   updateBill,
   updateBillStatus,
   createPayment,
+  findPaymentById,
   findPaymentByBillId,
+  findPaymentByRazorpayOrderId,
   findPaymentsByFlat,
   findPaymentsBySociety,
-  getDashboardStats
+  updatePayment,
+  getDashboardStats,
+  getTransparencyStats
 } from "./maintenance.repository.js";
 
-const calculateTotalAmount = (maintenanceAmount, lateFee = 0) => {
-  return maintenanceAmount + lateFee;
-};
 
-const validateBillOwnership = async (billId, societyId) => {
-  if (!mongoose.isValidObjectId(billId)) {
-    throw new ApiError(400, "BILL_ID_INVALID", "Maintenance bill ID is invalid");
-  }
-
-  const bill = await findBillById(billId);
-
-  if (!bill) {
-    throw new ApiError(404, "MAINTENANCE_BILL_NOT_FOUND", "Maintenance bill not found");
-  }
-
-  if (bill.societyId.toString() !== societyId.toString()) {
-    throw new ApiError(
-      403,
-      "MAINTENANCE_BILL_FORBIDDEN",
-      "This bill does not belong to your society"
-    );
-  }
-
-  return bill;
-};
+// =====================================================
+// CREATE MAINTENANCE BILL
+// =====================================================
 
 const createMaintenanceBill = async ({
   societyId,
-  userId,
   flatId,
   month,
   maintenanceAmount,
   dueDate,
   lateFee = 0,
-  adjustmentReason
+  adjustmentReason,
+  createdBy
 }) => {
-  const flat = await Flat.findOne({
-    _id: flatId,
-    societyId
-  });
 
-  if (!flat) {
-    throw new ApiError(404, "FLAT_NOT_FOUND", "Flat not found in this society");
+  if (
+    !mongoose.isValidObjectId(
+      societyId
+    )
+  ) {
+    throw new ApiError(
+      400,
+      "SOCIETY_ID_INVALID",
+      "Society ID is invalid"
+    );
   }
 
-  const existingBill = await findBillByFlatAndMonth(societyId, flatId, month);
+
+  if (
+    !mongoose.isValidObjectId(
+      flatId
+    )
+  ) {
+    throw new ApiError(
+      400,
+      "FLAT_ID_INVALID",
+      "Flat ID is invalid"
+    );
+  }
+
+
+  const existingBill =
+    await findBillByFlatAndMonth(
+      societyId,
+      flatId,
+      month
+    );
+
 
   if (existingBill) {
+
     throw new ApiError(
       409,
       "MAINTENANCE_BILL_EXISTS",
-      "A maintenance bill already exists for this flat and month"
+      "Maintenance bill already exists for this flat and month"
     );
   }
 
-  const totalAmount = calculateTotalAmount(maintenanceAmount, lateFee);
 
-  return createBill({
-    societyId,
-    flatId,
-    month,
-    maintenanceAmount,
-    dueDate,
-    lateFee,
-    totalAmount,
-    status: "PENDING",
-    adjustmentReason,
-    createdBy: userId
-  });
-};
+  const bill =
+    await createBill({
 
-const generateMonthlyBills = async ({
-  societyId,
-  userId,
-  month,
-  dueDate,
-  defaultMaintenanceAmount,
-  lateFee = 0
-}) => {
-  const flats = await Flat.find({
-    societyId
-  }).sort({
-    flatNumber: 1
-  });
-
-  if (!flats.length) {
-    throw new ApiError(404, "NO_FLATS_FOUND", "No flats found in this society");
-  }
-
-  const existingBills = await findBillsBySocietyAndMonth(societyId, month);
-
-  const existingFlatIds = new Set(existingBills.map((bill) => bill.flatId._id.toString()));
-
-  const billsToCreate = flats
-    .filter((flat) => !existingFlatIds.has(flat._id.toString()))
-    .map((flat) => ({
       societyId,
-      flatId: flat._id,
+
+      flatId,
+
       month,
-      maintenanceAmount: defaultMaintenanceAmount,
+
+      maintenanceAmount,
+
       dueDate,
+
       lateFee,
-      totalAmount: calculateTotalAmount(defaultMaintenanceAmount, lateFee),
-      status: "PENDING",
-      createdBy: userId
-    }));
 
-  if (!billsToCreate.length) {
-    throw new ApiError(
-      409,
-      "MONTHLY_BILLS_ALREADY_GENERATED",
-      "Maintenance bills have already been generated for all flats for this month"
-    );
-  }
+      totalAmount:
+        maintenanceAmount,
 
-  return createBills(billsToCreate);
-};
+      status:
+        "PENDING",
 
-const getMaintenanceBill = async ({ societyId, billId }) => {
-  await validateBillOwnership(billId, societyId);
+      adjustmentReason,
 
-  return findBillByIdWithDetails(billId);
-};
+      createdBy
+    });
 
-const getCurrentMaintenanceBill = async ({ societyId, flatId }) => {
-  const bill = await findCurrentBill(societyId, flatId);
-
-  if (!bill) {
-    throw new ApiError(404, "MAINTENANCE_BILL_NOT_FOUND", "No maintenance bill found");
-  }
 
   return bill;
 };
 
-const getMaintenanceHistory = async ({ societyId, flatId }) => {
-  return findBillsByFlat(societyId, flatId);
+
+// =====================================================
+// GENERATE MONTHLY BILLS
+// =====================================================
+
+const generateMonthlyBills = async ({
+  societyId,
+  month,
+  dueDate,
+  defaultMaintenanceAmount,
+  lateFee = 0,
+  createdBy
+}) => {
+
+  const Flat =
+    mongoose.model("Flat");
+
+
+  const flats =
+    await Flat.find({
+      societyId,
+      isOccupied: true
+    })
+      .select("_id")
+      .lean();
+
+
+  if (!flats.length) {
+
+    return {
+      created: 0,
+      skipped: 0,
+      bills: []
+    };
+  }
+
+
+  const existingBills =
+    await findBillsBySocietyAndMonth(
+      societyId,
+      month
+    );
+
+
+  const existingFlatIds =
+    new Set(
+      existingBills.map(
+        (bill) =>
+          bill.flatId._id.toString()
+      )
+    );
+
+
+  const billsToCreate = [];
+
+
+  for (const flat of flats) {
+
+    if (
+      existingFlatIds.has(
+        flat._id.toString()
+      )
+    ) {
+      continue;
+    }
+
+
+    billsToCreate.push({
+
+      societyId,
+
+      flatId:
+        flat._id,
+
+      month,
+
+      maintenanceAmount:
+        defaultMaintenanceAmount,
+
+      dueDate,
+
+      lateFee,
+
+      totalAmount:
+        defaultMaintenanceAmount,
+
+      status:
+        "PENDING",
+
+      createdBy
+    });
+  }
+
+
+  const bills =
+    await createBills(
+      billsToCreate
+    );
+
+
+  return {
+
+    created:
+      bills.length,
+
+    skipped:
+      flats.length - bills.length,
+
+    bills
+  };
 };
+
+
+// =====================================================
+// GET BILL
+// =====================================================
+
+const getMaintenanceBill = async ({
+  societyId,
+  billId
+}) => {
+
+  if (
+    !mongoose.isValidObjectId(
+      billId
+    )
+  ) {
+    throw new ApiError(
+      400,
+      "BILL_ID_INVALID",
+      "Bill ID is invalid"
+    );
+  }
+
+
+  const bill =
+    await findBillByIdWithDetails(
+      societyId,
+      billId
+    );
+
+
+  if (!bill) {
+
+    throw new ApiError(
+      404,
+      "MAINTENANCE_BILL_NOT_FOUND",
+      "Maintenance bill not found"
+    );
+  }
+
+
+  return bill;
+};
+
+
+// =====================================================
+// GET CURRENT BILL
+// =====================================================
+
+const getCurrentMaintenanceBill = async ({
+  societyId,
+  flatId
+}) => {
+
+  const bill =
+    await findCurrentBill(
+      societyId,
+      flatId
+    );
+
+
+  return bill;
+};
+
+
+// =====================================================
+// GET MAINTENANCE HISTORY
+// =====================================================
+
+const getMaintenanceHistory = async ({
+  societyId,
+  flatId
+}) => {
+
+  const bills =
+    await findBillsByFlat(
+      societyId,
+      flatId
+    );
+
+
+  return bills;
+};
+
+
+// =====================================================
+// GET SOCIETY BILLS BY MONTH
+// =====================================================
+
+const getSocietyBills = async ({
+  societyId,
+  month
+}) => {
+
+  if (
+    !month ||
+    !/^\d{4}-(0[1-9]|1[0-2])$/.test(
+      month
+    )
+  ) {
+
+    throw new ApiError(
+      400,
+      "MONTH_INVALID",
+      "Month must be in YYYY-MM format"
+    );
+  }
+
+
+  const bills =
+    await findBillsBySocietyAndMonth(
+      societyId,
+      month
+    );
+
+
+  return bills;
+};
+
+
+// =====================================================
+// UPDATE MAINTENANCE BILL
+// =====================================================
 
 const updateMaintenanceBill = async ({
   societyId,
@@ -167,63 +359,256 @@ const updateMaintenanceBill = async ({
   lateFee,
   adjustmentReason
 }) => {
-  const bill = await validateBillOwnership(billId, societyId);
 
-  if (bill.status === "PAID") {
+  if (
+    !mongoose.isValidObjectId(
+      billId
+    )
+  ) {
+    throw new ApiError(
+      400,
+      "BILL_ID_INVALID",
+      "Bill ID is invalid"
+    );
+  }
+
+
+  const existingBill =
+    await findBillById(
+      societyId,
+      billId
+    );
+
+
+  if (!existingBill) {
+
+    throw new ApiError(
+      404,
+      "MAINTENANCE_BILL_NOT_FOUND",
+      "Maintenance bill not found"
+    );
+  }
+
+
+  if (
+    existingBill.status === "PAID"
+  ) {
+
     throw new ApiError(
       400,
       "PAID_BILL_CANNOT_BE_EDITED",
-      "A paid maintenance bill cannot be edited"
+      "Paid maintenance bills cannot be edited"
     );
   }
+
 
   const updates = {};
 
-  if (maintenanceAmount !== undefined) {
-    updates.maintenanceAmount = maintenanceAmount;
+
+  if (
+    typeof maintenanceAmount !==
+    "undefined"
+  ) {
+
+    updates.maintenanceAmount =
+      maintenanceAmount;
   }
 
-  if (dueDate !== undefined) {
-    updates.dueDate = dueDate;
+
+  if (
+    typeof dueDate !==
+    "undefined"
+  ) {
+
+    updates.dueDate =
+      dueDate;
   }
 
-  if (lateFee !== undefined) {
-    updates.lateFee = lateFee;
+
+  if (
+    typeof lateFee !==
+    "undefined"
+  ) {
+
+    updates.lateFee =
+      lateFee;
   }
 
-  if (maintenanceAmount !== undefined || lateFee !== undefined) {
-    updates.totalAmount = calculateTotalAmount(
-      maintenanceAmount !== undefined ? maintenanceAmount : bill.maintenanceAmount,
-      lateFee !== undefined ? lateFee : bill.lateFee
+
+  if (
+    typeof adjustmentReason !==
+    "undefined"
+  ) {
+
+    updates.adjustmentReason =
+      adjustmentReason;
+  }
+
+
+  const finalMaintenanceAmount =
+    typeof maintenanceAmount !==
+    "undefined"
+      ? maintenanceAmount
+      : existingBill.maintenanceAmount;
+
+
+  const finalLateFee =
+    typeof lateFee !==
+    "undefined"
+      ? lateFee
+      : existingBill.lateFee;
+
+
+  const finalDueDate =
+    typeof dueDate !==
+    "undefined"
+      ? new Date(dueDate)
+      : new Date(
+          existingBill.dueDate
+        );
+
+
+  // ---------------------------------------------------
+  // Late fee is charged ONLY after overdue
+  // ---------------------------------------------------
+
+  const dueDateEnd =
+    new Date(
+      finalDueDate
     );
+
+  dueDateEnd.setHours(
+    23,
+    59,
+    59,
+    999
+  );
+
+
+  const isOverdue =
+    existingBill.status ===
+      "OVERDUE" ||
+    new Date() >
+      dueDateEnd;
+
+
+  if (isOverdue) {
+
+    updates.status =
+      "OVERDUE";
+
+    updates.totalAmount =
+      finalMaintenanceAmount +
+      finalLateFee;
+
+  } else {
+
+    updates.status =
+      "PENDING";
+
+    updates.totalAmount =
+      finalMaintenanceAmount;
   }
 
-  if (adjustmentReason !== undefined) {
-    updates.adjustmentReason = adjustmentReason;
-  }
 
-  return updateBill(billId, updates);
+  const updatedBill =
+    await updateBill(
+      societyId,
+      billId,
+      updates
+    );
+
+
+  return updatedBill;
 };
 
-const markOverdueBills = async ({ societyId, month }) => {
-  const bills = await findBillsBySocietyAndMonth(societyId, month);
 
-  const now = new Date();
-  const overdueBills = [];
+// =====================================================
+// MARK OVERDUE BILLS
+// =====================================================
+
+const markOverdueBills = async ({
+  societyId,
+  month
+}) => {
+
+  const bills =
+    await findBillsBySocietyAndMonth(
+      societyId,
+      month
+    );
+
+
+  const now =
+    new Date();
+
+
+  let updatedCount = 0;
+
 
   for (const bill of bills) {
-    if (bill.status !== "PAID" && new Date(bill.dueDate) < now) {
-      await updateBillStatus(bill._id, "OVERDUE");
 
-      overdueBills.push(bill._id);
+    if (
+      bill.status !==
+      "PENDING"
+    ) {
+      continue;
     }
+
+
+    const dueDate =
+      new Date(
+        bill.dueDate
+      );
+
+
+    dueDate.setHours(
+      23,
+      59,
+      59,
+      999
+    );
+
+
+    if (
+      now <= dueDate
+    ) {
+      continue;
+    }
+
+
+    await updateBillStatus(
+
+      societyId,
+
+      bill._id,
+
+      "OVERDUE",
+
+      Number(
+        bill.maintenanceAmount || 0
+      ) +
+        Number(
+          bill.lateFee || 0
+        )
+    );
+
+
+    updatedCount += 1;
   }
 
+
   return {
-    updatedCount: overdueBills.length,
-    billIds: overdueBills
+
+    updated:
+      updatedCount
   };
 };
+
+
+// =====================================================
+// RECORD OFFLINE PAYMENT
+// =====================================================
 
 const recordOfflinePayment = async ({
   societyId,
@@ -233,90 +618,740 @@ const recordOfflinePayment = async ({
   paymentDate,
   transactionId
 }) => {
-  const bill = await validateBillOwnership(billId, societyId);
 
-  if (bill.status === "PAID") {
-    throw new ApiError(409, "BILL_ALREADY_PAID", "This maintenance bill has already been paid");
+  if (
+    !mongoose.isValidObjectId(
+      billId
+    )
+  ) {
+    throw new ApiError(
+      400,
+      "BILL_ID_INVALID",
+      "Bill ID is invalid"
+    );
   }
 
-  if (amount !== bill.totalAmount) {
+
+  const bill =
+    await findBillById(
+      societyId,
+      billId
+    );
+
+
+  if (!bill) {
+
+    throw new ApiError(
+      404,
+      "MAINTENANCE_BILL_NOT_FOUND",
+      "Maintenance bill not found"
+    );
+  }
+
+
+  if (
+    bill.status === "PAID"
+  ) {
+
+    throw new ApiError(
+      400,
+      "BILL_ALREADY_PAID",
+      "This maintenance bill is already paid"
+    );
+  }
+
+
+  if (
+    Number(amount) !==
+    Number(bill.totalAmount)
+  ) {
+
     throw new ApiError(
       400,
       "PAYMENT_AMOUNT_MISMATCH",
-      `Payment amount must be ₹${bill.totalAmount}`
+      "Payment amount must match the bill total amount"
     );
   }
 
-  const existingPayment = await findPaymentByBillId(billId);
 
-  if (existingPayment && existingPayment.status === "SUCCESS") {
-    throw new ApiError(
-      409,
-      "PAYMENT_ALREADY_RECORDED",
-      "Payment has already been recorded for this bill"
-    );
-  }
+  const payment =
+    await createPayment({
 
-  const receiptNumber = `REC-${Date.now()}`;
+      societyId,
 
-  const payment = await createPayment({
+      flatId:
+        bill.flatId,
+
+      billId:
+        bill._id,
+
+      amount,
+
+      paymentMethod,
+
+      paymentDate,
+
+      transactionId,
+
+      status:
+        "SUCCESS",
+
+      receiptNumber:
+        `REC-${Date.now()}`
+    });
+
+
+  await updateBillStatus(
+
     societyId,
-    flatId: bill.flatId,
-    billId: bill._id,
-    amount,
-    paymentMethod,
-    paymentDate,
-    transactionId,
-    status: "SUCCESS",
-    receiptNumber
-  });
 
-  await updateBillStatus(bill._id, "PAID");
+    bill._id,
+
+    "PAID",
+
+    bill.totalAmount
+  );
+
 
   return payment;
 };
 
-const getPaymentHistory = async ({ societyId, flatId }) => {
-  return findPaymentsByFlat(societyId, flatId);
+
+// =====================================================
+// GET MY PAYMENT HISTORY
+// =====================================================
+
+const getPaymentHistory = async ({
+  societyId,
+  flatId
+}) => {
+
+  const payments =
+    await findPaymentsByFlat(
+      societyId,
+      flatId
+    );
+
+
+  return payments;
 };
 
-const getSocietyPaymentHistory = async ({ societyId }) => {
-  return findPaymentsBySociety(societyId);
+
+// =====================================================
+// GET SOCIETY PAYMENT HISTORY
+// =====================================================
+
+const getSocietyPaymentHistory = async ({
+  societyId,
+  month
+}) => {
+
+  const payments =
+    await findPaymentsBySociety(
+      societyId,
+      month
+    );
+
+
+  return payments;
 };
 
-const getMaintenanceDashboard = async ({ societyId, month }) => {
-  return getDashboardStats(societyId, month);
-};
 
-const getPayment = async ({ societyId, paymentId }) => {
-  if (!mongoose.isValidObjectId(paymentId)) {
-    throw new ApiError(400, "PAYMENT_ID_INVALID", "Payment ID is invalid");
+// =====================================================
+// GET PAYMENT
+// =====================================================
+
+const getPayment = async ({
+  societyId,
+  paymentId
+}) => {
+
+  if (
+    !mongoose.isValidObjectId(
+      paymentId
+    )
+  ) {
+    throw new ApiError(
+      400,
+      "PAYMENT_ID_INVALID",
+      "Payment ID is invalid"
+    );
   }
 
-  const payment = await findPaymentById(paymentId);
+
+  const payment =
+    await findPaymentById(
+      societyId,
+      paymentId
+    );
+
 
   if (!payment) {
-    throw new ApiError(404, "PAYMENT_NOT_FOUND", "Payment not found");
+
+    throw new ApiError(
+      404,
+      "PAYMENT_NOT_FOUND",
+      "Payment not found"
+    );
   }
 
-  if (payment.societyId.toString() !== societyId.toString()) {
-    throw new ApiError(403, "PAYMENT_FORBIDDEN", "This payment does not belong to your society");
-  }
 
   return payment;
 };
+// =====================================================
+// GET MAINTENANCE DASHBOARD
+// =====================================================
+
+const getMaintenanceDashboard = async ({
+  societyId,
+  month
+}) => {
+
+  if (
+    !month ||
+    !/^\d{4}-(0[1-9]|1[0-2])$/.test(
+      month
+    )
+  ) {
+
+    throw new ApiError(
+      400,
+      "MONTH_INVALID",
+      "Month must be in YYYY-MM format"
+    );
+  }
+
+
+  const stats =
+    await getDashboardStats(
+      societyId,
+      month
+    );
+
+
+  const bills =
+    await findBillsBySocietyAndMonth(
+      societyId,
+      month
+    );
+
+
+  return {
+
+    month,
+
+    stats,
+
+    bills
+  };
+};
+
+
+// =====================================================
+// CREATE RAZORPAY PAYMENT ORDER
+// =====================================================
+
+const createMaintenancePaymentOrder =
+  async ({
+    societyId,
+    billId,
+    flatId,
+    role,
+    userId
+  }) => {
+
+    if (
+      !mongoose.isValidObjectId(
+        billId
+      )
+    ) {
+      throw new ApiError(
+        400,
+        "BILL_ID_INVALID",
+        "Bill ID is invalid"
+      );
+    }
+
+
+    const bill =
+      await findBillById(
+        societyId,
+        billId
+      );
+
+
+    if (!bill) {
+
+      throw new ApiError(
+        404,
+        "MAINTENANCE_BILL_NOT_FOUND",
+        "Maintenance bill not found"
+      );
+    }
+
+
+    if (
+      bill.status === "PAID"
+    ) {
+
+      throw new ApiError(
+        400,
+        "BILL_ALREADY_PAID",
+        "This maintenance bill is already paid"
+      );
+    }
+
+
+    // ---------------------------------------------------
+    // Resident can pay only their own flat's bill
+    // ---------------------------------------------------
+
+    if (
+      role === "RESIDENT" &&
+      bill.flatId.toString() !==
+        flatId.toString()
+    ) {
+
+      throw new ApiError(
+        403,
+        "BILL_ACCESS_FORBIDDEN",
+        "You can only pay your own maintenance bill"
+      );
+    }
+
+
+    // ---------------------------------------------------
+    // Create Razorpay order
+    // ---------------------------------------------------
+
+    const razorpay =
+      getRazorpayClient();
+
+
+    const order =
+      await razorpay.orders.create({
+
+        amount:
+          Math.round(
+            Number(
+              bill.totalAmount
+            ) * 100
+          ),
+
+        currency:
+          "INR",
+
+        receipt:
+          `maintenance_${bill._id}`,
+
+        notes: {
+
+          societyId:
+            societyId.toString(),
+
+          billId:
+            bill._id.toString(),
+
+          userId:
+            userId.toString()
+        }
+      });
+
+
+    // ---------------------------------------------------
+    // Save payment as PENDING
+    // ---------------------------------------------------
+
+    const payment =
+      await createPayment({
+
+        societyId,
+
+        flatId:
+          bill.flatId,
+
+        billId:
+          bill._id,
+
+        amount:
+          bill.totalAmount,
+
+        paymentMethod:
+          "RAZORPAY",
+
+        paymentDate:
+          new Date(),
+
+        razorpayOrderId:
+          order.id,
+
+        status:
+          "PENDING"
+      });
+
+
+    return {
+
+      order,
+
+      paymentId:
+        payment._id,
+
+      // Required by Razorpay Checkout
+      keyId:
+        process.env.RAZORPAY_KEY_ID
+    };
+  };
+
+
+// =====================================================
+// VERIFY RAZORPAY PAYMENT
+// =====================================================
+
+const verifyMaintenancePayment =
+  async ({
+    societyId,
+    billId,
+    flatId,
+    role,
+    razorpayOrderId,
+    razorpayPaymentId,
+    razorpaySignature
+  }) => {
+
+    if (
+      !mongoose.isValidObjectId(
+        billId
+      )
+    ) {
+      throw new ApiError(
+        400,
+        "BILL_ID_INVALID",
+        "Bill ID is invalid"
+      );
+    }
+
+
+    const bill =
+      await findBillById(
+        societyId,
+        billId
+      );
+
+
+    if (!bill) {
+
+      throw new ApiError(
+        404,
+        "MAINTENANCE_BILL_NOT_FOUND",
+        "Maintenance bill not found"
+      );
+    }
+
+
+    if (
+      bill.status === "PAID"
+    ) {
+
+      throw new ApiError(
+        400,
+        "BILL_ALREADY_PAID",
+        "This maintenance bill is already paid"
+      );
+    }
+
+
+    // ---------------------------------------------------
+    // Resident can verify only their own flat's bill
+    // ---------------------------------------------------
+
+    if (
+      role === "RESIDENT" &&
+      bill.flatId.toString() !==
+        flatId.toString()
+    ) {
+
+      throw new ApiError(
+        403,
+        "BILL_ACCESS_FORBIDDEN",
+        "You can only pay your own maintenance bill"
+      );
+    }
+
+
+    // ---------------------------------------------------
+    // Find the payment created for this Razorpay order
+    // ---------------------------------------------------
+
+    const payment =
+      await findPaymentByRazorpayOrderId(
+        societyId,
+        razorpayOrderId
+      );
+
+
+    if (!payment) {
+
+      throw new ApiError(
+        404,
+        "PAYMENT_NOT_FOUND",
+        "Maintenance payment record not found"
+      );
+    }
+
+
+    // ---------------------------------------------------
+    // Get the order ID saved on our server
+    // ---------------------------------------------------
+
+    const serverOrderId =
+      payment.razorpayOrderId;
+
+
+    if (
+      !serverOrderId ||
+      serverOrderId !== razorpayOrderId
+    ) {
+
+      throw new ApiError(
+        400,
+        "RAZORPAY_ORDER_MISMATCH",
+        "Razorpay order verification failed"
+      );
+    }
+
+
+    // ---------------------------------------------------
+    // Verify Razorpay signature
+    // ---------------------------------------------------
+
+    const secret =
+      process.env.RAZORPAY_KEY_SECRET;
+
+
+    if (!secret) {
+
+      throw new ApiError(
+        500,
+        "RAZORPAY_SECRET_MISSING",
+        "Razorpay key secret is not configured"
+      );
+    }
+
+
+    const expectedSignature =
+      crypto
+        .createHmac(
+          "sha256",
+          secret
+        )
+        .update(
+          `${serverOrderId}|${razorpayPaymentId}`
+        )
+        .digest("hex");
+
+
+    if (
+      expectedSignature !==
+      razorpaySignature
+    ) {
+
+      await updatePaymentByOrderIfExists(
+        societyId,
+        razorpayOrderId,
+        {
+          status:
+            "FAILED"
+        }
+      );
+
+
+      throw new ApiError(
+        400,
+        "RAZORPAY_SIGNATURE_INVALID",
+        "Razorpay payment verification failed"
+      );
+    }
+
+
+    // ---------------------------------------------------
+    // Mark payment successful
+    // ---------------------------------------------------
+
+    await updatePayment(
+
+      societyId,
+
+      payment._id,
+
+      {
+
+        razorpayPaymentId,
+
+        status:
+          "SUCCESS",
+
+        receiptNumber:
+          payment.receiptNumber ||
+          `REC-${Date.now()}`,
+
+        paymentDate:
+          new Date()
+      }
+    );
+
+
+    // ---------------------------------------------------
+    // Mark bill paid
+    // ---------------------------------------------------
+
+    await updateBillStatus(
+
+      societyId,
+
+      bill._id,
+
+      "PAID",
+
+      bill.totalAmount
+    );
+
+
+    const updatedPayment =
+      await findPaymentById(
+        societyId,
+        payment._id
+      );
+
+
+    return updatedPayment;
+  };
+
+// =====================================================
+// HELPER FOR FAILED RAZORPAY PAYMENT
+// =====================================================
+
+const updatePaymentByOrderIfExists =
+  async (
+    societyId,
+    razorpayOrderId,
+    updates
+  ) => {
+
+    const payment =
+      await findPaymentByRazorpayOrderId(
+        societyId,
+        razorpayOrderId
+      );
+
+
+    if (!payment) {
+      return null;
+    }
+
+
+    return updatePayment(
+
+      societyId,
+
+      payment._id,
+
+      updates
+    );
+  };
+
+
+// =====================================================
+// SOCIETY TRANSPARENCY
+// =====================================================
+//
+// Returns every flat and its maintenance status
+// for the selected month.
+//
+// Resident-safe information:
+// - flat number
+// - amount
+// - status
+// - payment date
+//
+// Possible status:
+// - PAID
+// - PENDING
+// - OVERDUE
+// - NO_BILL
+// =====================================================
+
+const getMaintenanceTransparency = async ({
+  societyId,
+  month
+}) => {
+
+  if (
+    !month ||
+    !/^\d{4}-(0[1-9]|1[0-2])$/.test(
+      month
+    )
+  ) {
+
+    throw new ApiError(
+      400,
+      "MONTH_INVALID",
+      "Month must be in YYYY-MM format"
+    );
+  }
+
+
+  const flats =
+    await getTransparencyStats(
+      societyId,
+      month
+    );
+
+
+  return {
+
+    month,
+
+    flats
+  };
+};
+
+
+// =====================================================
+// EXPORTS
+// =====================================================
 
 export {
+
   createMaintenanceBill,
+
   generateMonthlyBills,
+
   getMaintenanceBill,
+
   getCurrentMaintenanceBill,
+
   getMaintenanceHistory,
+
+  getSocietyBills,
+
   updateMaintenanceBill,
+
   markOverdueBills,
+
   recordOfflinePayment,
+
   getPaymentHistory,
+
   getSocietyPaymentHistory,
+
+  getPayment,
+
   getMaintenanceDashboard,
-  getPayment
+
+  createMaintenancePaymentOrder,
+
+  verifyMaintenancePayment,
+
+  getMaintenanceTransparency
 };
