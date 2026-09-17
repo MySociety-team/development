@@ -17,6 +17,10 @@ function MeetingDetailsPage() {
   const [errorMessage, setErrorMessage] = useState("");
   const [processing, setProcessing] = useState(false);
 
+  const [summary, setSummary] = useState("");
+  const [summaryProcessing, setSummaryProcessing] = useState(false);
+  const [summaryMessage, setSummaryMessage] = useState("");
+
   const [modal, setModal] = useState({
     open: false,
     type: null
@@ -35,6 +39,7 @@ function MeetingDetailsPage() {
         if (!cancelled) {
           setMeeting(meetingData);
           setMembership(societyData.membership);
+          setSummary(meetingData.summary || "");
         }
       } catch (error) {
         if (!cancelled) {
@@ -91,6 +96,7 @@ function MeetingDetailsPage() {
         });
 
         setMeeting(updatedMeeting);
+        setSummary(updatedMeeting.summary || "");
       }
 
       if (modal.type === "cancel") {
@@ -121,6 +127,28 @@ function MeetingDetailsPage() {
       );
     } finally {
       setProcessing(false);
+    }
+  };
+
+  const handleSaveSummary = async (event) => {
+    event.preventDefault();
+
+    try {
+      setSummaryProcessing(true);
+      setSummaryMessage("");
+      setErrorMessage("");
+
+      const updatedMeeting = await updateMeeting(societyId, meetingId, {
+        summary: summary.trim()
+      });
+
+      setMeeting(updatedMeeting);
+      setSummary(updatedMeeting.summary || "");
+      setSummaryMessage("Meeting summary saved successfully.");
+    } catch (error) {
+      setErrorMessage(getApiErrorMessage(error, "Unable to save meeting summary."));
+    } finally {
+      setSummaryProcessing(false);
     }
   };
 
@@ -286,6 +314,58 @@ function MeetingDetailsPage() {
             )}
           </section>
 
+          {/* MEETING SUMMARY */}
+          {meeting.status === "COMPLETED" && (
+            <section className="rounded-3xl border border-slate-200 bg-white p-7 shadow-sm">
+              <div>
+                <h2 className="text-lg font-bold text-slate-950">Meeting Summary</h2>
+
+                <p className="mt-1 text-sm text-slate-500">
+                  Summary of what was discussed and decided in this meeting.
+                </p>
+              </div>
+
+              {isSecretary ? (
+                <form onSubmit={handleSaveSummary} className="mt-5">
+                  <textarea
+                    value={summary}
+                    onChange={(event) => {
+                      setSummary(event.target.value);
+                      setSummaryMessage("");
+                    }}
+                    rows={6}
+                    placeholder="Enter the meeting summary..."
+                    className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
+                  />
+
+                  <div className="mt-4 flex flex-wrap items-center gap-3">
+                    <button
+                      type="submit"
+                      disabled={summaryProcessing}
+                      className="rounded-xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {summaryProcessing ? "Saving..." : "Save Summary"}
+                    </button>
+
+                    {summaryMessage && (
+                      <p className="text-sm font-medium text-green-600">{summaryMessage}</p>
+                    )}
+                  </div>
+                </form>
+              ) : meeting.summary ? (
+                <div className="mt-5 rounded-2xl bg-slate-50 p-5">
+                  <p className="whitespace-pre-wrap text-sm leading-7 text-slate-700">
+                    {meeting.summary}
+                  </p>
+                </div>
+              ) : (
+                <div className="mt-5 rounded-2xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500">
+                  No summary has been added yet.
+                </div>
+              )}
+            </section>
+          )}
+
           {meeting.status === "COMPLETED" && (
             <section className="rounded-3xl border border-slate-200 bg-white p-7 shadow-sm">
               <div className="flex items-center justify-between gap-4">
@@ -318,7 +398,6 @@ function MeetingDetailsPage() {
                         key={memberId}
                         className="flex items-center justify-between gap-4 rounded-xl border border-slate-200 px-4 py-4"
                       >
-                        {/* MEMBER */}
                         <div className="min-w-0">
                           <p className="text-sm font-semibold text-slate-900">{memberName}</p>
 
@@ -327,7 +406,6 @@ function MeetingDetailsPage() {
                           )}
                         </div>
 
-                        {/* STATUS */}
                         <span
                           className={`shrink-0 rounded-full px-3 py-1 text-xs font-bold ${
                             record.status === "PRESENT"

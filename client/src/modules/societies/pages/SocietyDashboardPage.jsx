@@ -17,6 +17,7 @@ function SocietyDashboardPage() {
     if (!code) {
       return;
     }
+
     try {
       await navigator.clipboard.writeText(code);
       setCopied(true);
@@ -216,14 +217,14 @@ function SocietyDashboardPage() {
                 </p>
 
                 <div className="mt-3 flex items-center justify-center gap-3">
-                  <p className="font-mono text-3xl font-bold tracking-[0.22em] text-slate-950 sm:text-4xl">
+                  <p className="pl-4 font-mono text-3xl font-bold tracking-[0.22em] text-slate-950 sm:text-4xl">
                     {society.joiningCode}
                   </p>
 
                   <button
                     type="button"
                     onClick={() => handleCopyCode(society.joiningCode)}
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-300 bg-white text-slate-600 shadow-xs transition hover:border-slate-400 hover:bg-slate-100 hover:text-slate-950 focus:outline-none focus:ring-2 focus:ring-slate-400/20 cursor-pointer"
+                    className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-slate-300 bg-white text-slate-600 shadow-sm transition hover:border-slate-400 hover:bg-slate-100 hover:text-slate-950 focus:outline-none focus:ring-2 focus:ring-slate-400/20"
                     title={copied ? "Copied to clipboard!" : "Copy joining code"}
                     aria-label="Copy joining code"
                   >
@@ -301,13 +302,11 @@ function SocietyDashboardPage() {
             <dl className="mt-5 divide-y divide-slate-100">
               <div className="flex items-center justify-between gap-4 py-3">
                 <dt className="text-sm text-slate-500">Floor</dt>
-
                 <dd className="text-sm font-semibold text-slate-900">{membership.flat?.floor}</dd>
               </div>
 
               <div className="flex items-center justify-between gap-4 py-3">
                 <dt className="text-sm text-slate-500">Type</dt>
-
                 <dd className="text-sm font-semibold text-slate-900">
                   {membership.flat?.flatType}
                 </dd>
@@ -315,7 +314,6 @@ function SocietyDashboardPage() {
 
               <div className="flex items-center justify-between gap-4 py-3">
                 <dt className="text-sm text-slate-500">Mobile</dt>
-
                 <dd className="text-sm font-semibold text-slate-900">{membership.mobileNumber}</dd>
               </div>
             </dl>
@@ -418,6 +416,35 @@ function SocietyDashboardPage() {
             </div>
           </Link>
 
+          {/* Announcements */}
+          <Link
+            to={`/societies/${society.id}/announcements`}
+            className="group flex h-full flex-col rounded-3xl border border-slate-200 bg-white p-7 shadow-[0_14px_45px_-28px_rgba(15,23,42,0.3)] transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_18px_50px_-25px_rgba(15,23,42,0.35)]"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">
+                  Society
+                </p>
+
+                <h2 className="mt-2 text-lg font-bold text-slate-950">Announcements</h2>
+              </div>
+
+              <span className="text-xl text-slate-400 transition-transform duration-200 group-hover:translate-x-1 group-hover:text-slate-900">
+                →
+              </span>
+            </div>
+
+            <p className="mt-3 text-sm leading-6 text-slate-500">
+              View important announcements, updates, events, and notices from the society.
+            </p>
+
+            <div className="mt-auto pt-6 text-sm font-semibold text-slate-900">
+              View announcements
+              <span className="ml-1 transition-transform group-hover:translate-x-1">→</span>
+            </div>
+          </Link>
+
           {/* Society members */}
           <Link
             to={`/societies/${society.id}/members`}
@@ -447,7 +474,7 @@ function SocietyDashboardPage() {
             </div>
           </Link>
 
-          {/* Complaints */}
+          {/* Complaints helpdesk */}
           <Link
             to={`/societies/${society.id}/complaints`}
             className="group flex h-full flex-col rounded-3xl border border-slate-200 bg-white p-7 shadow-[0_14px_45px_-28px_rgba(15,23,42,0.3)] transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_18px_50px_-25px_rgba(15,23,42,0.35)]"
@@ -458,7 +485,7 @@ function SocietyDashboardPage() {
                   Helpdesk
                 </p>
 
-                <h2 className="mt-2 text-lg font-bold text-slate-950">Complaints</h2>
+                <h2 className="mt-2 text-lg font-bold text-slate-950">Complaints helpdesk</h2>
               </div>
 
               <span className="text-xl text-slate-400 transition-transform duration-200 group-hover:translate-x-1 group-hover:text-slate-900">
@@ -476,7 +503,7 @@ function SocietyDashboardPage() {
             </div>
           </Link>
 
-          {/* Contacts */}
+          {/* Society contacts */}
           <Link
             to={`/societies/${society.id}/contacts`}
             className="group flex h-full flex-col rounded-3xl border border-slate-200 bg-white p-7 shadow-[0_14px_45px_-28px_rgba(15,23,42,0.3)] transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_18px_50px_-25px_rgba(15,23,42,0.35)]"
@@ -484,10 +511,10 @@ function SocietyDashboardPage() {
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">
-                  Services
+                  Directory
                 </p>
 
-                <h2 className="mt-2 text-lg font-bold text-slate-950">Contacts directory</h2>
+                <h2 className="mt-2 text-lg font-bold text-slate-950">Society contacts</h2>
               </div>
 
               <span className="text-xl text-slate-400 transition-transform duration-200 group-hover:translate-x-1 group-hover:text-slate-900">
@@ -496,7 +523,8 @@ function SocietyDashboardPage() {
             </div>
 
             <p className="mt-3 text-sm leading-6 text-slate-500">
-              Find electricians, plumbers, cleaners, and other service providers.
+              Find contact numbers of emergency services, security, maintenance, and committee
+              members.
             </p>
 
             <div className="mt-auto pt-6 text-sm font-semibold text-slate-900">

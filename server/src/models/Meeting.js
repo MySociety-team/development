@@ -42,6 +42,12 @@ const meetingSchema = new Schema(
       default: ""
     },
 
+    summary: {
+      type: String,
+      trim: true,
+      default: ""
+    },
+
     dateTime: {
       type: Date,
       required: [true, "Meeting date and time is required"]
