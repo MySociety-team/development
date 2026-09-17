@@ -5,9 +5,8 @@ import Modal from "../../../components/common/Modal.jsx";
 import ConfirmationDialog from "../../../components/common/ConfirmationDialog.jsx";
 import EmptyState from "../../../components/common/EmptyState.jsx";
 import Button from "../../../components/common/Button.jsx";
-import Textarea from "../../../components/common/Textarea.jsx";
-import { useAuth } from "../../../modules/auth/hooks/useAuth.js";
-import { getSociety } from "../../../modules/societies/api/society.api.js";
+import { useAuth } from "../../auth/hooks/useAuth.js";
+import { getSociety } from "../../societies/api/society.api.js";
 import { getApiErrorMessage } from "../../../lib/apiError.js";
 import {
   getComplaints,
@@ -34,9 +33,6 @@ function ComplaintsPage() {
   const [submitting, setSubmitting] = useState(false);
   const [deleteTargetId, setDeleteTargetId] = useState(null);
   const [deleting, setDeleting] = useState(false);
-  const [statusUpdateTarget, setStatusUpdateTarget] = useState(null);
-  const [updatingStatus, setUpdatingStatus] = useState(false);
-  const [decisionComment, setDecisionComment] = useState("");
 
   const [activeTab, setActiveTab] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -102,16 +98,17 @@ function ComplaintsPage() {
     }
   };
 
-  const handleStatusUpdate = async (complaintId, newStatus, comment) => {
-    setUpdatingStatus(true);
+  const handleStatusUpdate = async (complaintId, newStatus, resolutionNote) => {
     try {
-      await updateComplaintStatus(societyId, complaintId, newStatus, comment);
-      setStatusUpdateTarget(null);
+      await updateComplaintStatus(societyId, complaintId, {
+        status: newStatus,
+        resolutionNote
+      });
       await loadComplaints();
     } catch (err) {
-      setError(getApiErrorMessage(err, "Failed to update complaint status."));
-    } finally {
-      setUpdatingStatus(false);
+      const message = getApiErrorMessage(err, "Failed to update complaint status.");
+      setError(message);
+      throw new Error(message, { cause: err });
     }
   };
 
@@ -186,7 +183,7 @@ function ComplaintsPage() {
             <span className="font-medium">{error}</span>
             <button
               onClick={() => setError("")}
-              className="text-red-500 hover:text-red-700 font-bold ml-2"
+              className="text-red-500 hover:text-red-700 font-bold ml-2 cursor-pointer"
             >
               Close
             </button>
@@ -241,7 +238,7 @@ function ComplaintsPage() {
               <button
                 type="button"
                 onClick={() => setActiveTab("all")}
-                className={`rounded-lg px-4 py-2 text-xs font-bold tracking-wide transition-all ${
+                className={`rounded-lg px-4 py-2 text-xs font-bold tracking-wide transition-all cursor-pointer ${
                   activeTab === "all"
                     ? "bg-white text-slate-900 shadow-sm"
                     : "text-slate-500 hover:text-slate-900"
@@ -252,7 +249,7 @@ function ComplaintsPage() {
               <button
                 type="button"
                 onClick={() => setActiveTab("my")}
-                className={`rounded-lg px-4 py-2 text-xs font-bold tracking-wide transition-all ${
+                className={`rounded-lg px-4 py-2 text-xs font-bold tracking-wide transition-all cursor-pointer ${
                   activeTab === "my"
                     ? "bg-white text-slate-900 shadow-sm"
                     : "text-slate-500 hover:text-slate-900"
@@ -334,10 +331,7 @@ function ComplaintsPage() {
                 complaint={complaint}
                 currentUser={user}
                 userRole={membership?.role}
-                onStatusUpdate={(id, status) => {
-                  setDecisionComment("");
-                  setStatusUpdateTarget({ id, status });
-                }}
+                onStatusUpdate={handleStatusUpdate}
                 onDelete={setDeleteTargetId}
               />
             ))}
@@ -359,49 +353,6 @@ function ComplaintsPage() {
         onCancel={() => setDeleteTargetId(null)}
         loading={deleting}
       />
-
-      <Modal
-        isOpen={Boolean(statusUpdateTarget)}
-        title={statusUpdateTarget?.status === "resolved" ? "Resolve Complaint" : "Reject Complaint"}
-        onClose={() => setStatusUpdateTarget(null)}
-      >
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (!decisionComment.trim()) {
-              return;
-            }
-            handleStatusUpdate(statusUpdateTarget.id, statusUpdateTarget.status, decisionComment);
-          }}
-          className="space-y-4"
-        >
-          <div>
-            <Textarea
-              id="resolution-comment"
-              name="comment"
-              value={decisionComment}
-              onChange={(e) => setDecisionComment(e.target.value)}
-              label={
-                statusUpdateTarget?.status === "resolved"
-                  ? "Resolution Details (How is it resolved?)"
-                  : "Rejection Reason (Why is it rejected?)"
-              }
-              placeholder={
-                statusUpdateTarget?.status === "resolved"
-                  ? "Provide details about the resolution (e.g. Plumber fixed the pipe)..."
-                  : "Provide a reason for rejection..."
-              }
-              required
-              maxLength={300}
-            />
-          </div>
-          <div className="flex justify-end gap-3 pt-2">
-            <Button type="submit" loading={updatingStatus}>
-              Submit Decision
-            </Button>
-          </div>
-        </form>
-      </Modal>
     </AppShell>
   );
 }

@@ -9,18 +9,19 @@ const CATEGORY_OPTIONS = [
   { value: "ELECTRICAL", label: "Electrical" },
   { value: "SECURITY", label: "Security" },
   { value: "CLEANLINESS", label: "Cleanliness" },
+  { value: "SECRETARY", label: "Secretary / Management" },
   { value: "OTHER", label: "Other" }
 ];
 
 function ComplaintForm({ onSubmit, loading }) {
   const [title, setTitle] = useState("");
-  const [category, setCategory] = useState("");
+  const [category, setCategory] = useState("OTHER");
   const [description, setDescription] = useState("");
   const [error, setError] = useState("");
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!title.trim() || !description.trim() || !category) {
+    if (!title.trim() || !description.trim()) {
       setError("Please fill in all fields.");
       return;
     }
@@ -58,6 +59,12 @@ function ComplaintForm({ onSubmit, loading }) {
           required
           placeholder="Select category"
         />
+        {category === "SECRETARY" && (
+          <p className="mt-1 text-xs text-purple-700 bg-purple-50 rounded-lg p-2 border border-purple-200">
+            🛡️ <strong>Secretary Complaint</strong>: To protect residents, complaints in this
+            category can only be marked as resolved by you (the complainant), not the secretary.
+          </p>
+        )}
       </div>
 
       <div>
