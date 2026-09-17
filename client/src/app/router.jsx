@@ -21,6 +21,7 @@ import CreateMeetingPage from "../modules/meetings/pages/CreateMeetingPage.jsx";
 import MeetingDetailsPage from "../modules/meetings/pages/MeetingDetailsPage.jsx";
 import EditMeetingPage from "../modules/meetings/pages/EditMeetingPage.jsx";
 import MeetingAttendancePage from "../modules/meetings/pages/MeetingAttendancePage.jsx";
+import ComplaintsPage from "../modules/complaints/pages/ComplaintsPage.jsx";
 
 import NotFoundPage from "../pages/NotFoundPage.jsx";
 import RouteErrorPage from "../pages/RouteErrorPage.jsx";
@@ -119,6 +120,11 @@ const router = createBrowserRouter([
           {
             path: "/societies/:societyId/meetings/:meetingId/attendance",
             element: <MeetingAttendancePage />
+          },
+
+          {
+            path: "/societies/:societyId/complaints",
+            element: <ComplaintsPage />
           }
         ]
       },

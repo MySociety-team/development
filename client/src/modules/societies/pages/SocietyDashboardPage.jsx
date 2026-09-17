@@ -11,6 +11,27 @@ function SocietyDashboardPage() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
+  const [copied, setCopied] = useState(false);
+
+  const handleCopyCode = async (code) => {
+    if (!code) {
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      const textArea = document.createElement("textarea");
+      textArea.value = code;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textArea);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -87,7 +108,12 @@ function SocietyDashboardPage() {
   const { society, membership } = data;
 
   return (
-    <AppShell title={society.name} description={society.address} backTo="/societies">
+    <AppShell
+      title={society.name}
+      description={society.address}
+      backTo="/societies"
+      societyId={society.id}
+    >
       <div className="mx-auto max-w-6xl space-y-7">
         {/* Dashboard header */}
         <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_20px_60px_-32px_rgba(15,23,42,0.35)]">
@@ -189,13 +215,59 @@ function SocietyDashboardPage() {
                   Joining code
                 </p>
 
-                <p className="mt-3 font-mono text-3xl font-bold tracking-[0.22em] text-slate-950 sm:text-4xl">
-                  {society.joiningCode}
-                </p>
+                <div className="mt-3 flex items-center justify-center gap-3">
+                  <p className="font-mono text-3xl font-bold tracking-[0.22em] text-slate-950 sm:text-4xl">
+                    {society.joiningCode}
+                  </p>
 
-                <p className="mt-3 text-xs text-slate-500">
-                  Residents can use this code from the Join Society page.
-                </p>
+                  <button
+                    type="button"
+                    onClick={() => handleCopyCode(society.joiningCode)}
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-300 bg-white text-slate-600 shadow-xs transition hover:border-slate-400 hover:bg-slate-100 hover:text-slate-950 focus:outline-none focus:ring-2 focus:ring-slate-400/20 cursor-pointer"
+                    title={copied ? "Copied to clipboard!" : "Copy joining code"}
+                    aria-label="Copy joining code"
+                  >
+                    {copied ? (
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-5 w-5 text-emerald-600"
+                        viewBox="0 0 20 20"
+                        fill="currentColor"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                    ) : (
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-5 w-5"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                        />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+
+                {copied ? (
+                  <p className="mt-2 text-xs font-semibold text-emerald-600">
+                    Copied joining code to clipboard!
+                  </p>
+                ) : (
+                  <p className="mt-3 text-xs text-slate-500">
+                    Residents can use this code from the Join Society page.
+                  </p>
+                )}
               </div>
             </div>
           </section>
@@ -371,6 +443,64 @@ function SocietyDashboardPage() {
 
             <div className="mt-auto pt-6 text-sm font-semibold text-slate-900">
               View members
+              <span className="ml-1 transition-transform group-hover:translate-x-1">→</span>
+            </div>
+          </Link>
+
+          {/* Complaints */}
+          <Link
+            to={`/societies/${society.id}/complaints`}
+            className="group flex h-full flex-col rounded-3xl border border-slate-200 bg-white p-7 shadow-[0_14px_45px_-28px_rgba(15,23,42,0.3)] transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_18px_50px_-25px_rgba(15,23,42,0.35)]"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">
+                  Helpdesk
+                </p>
+
+                <h2 className="mt-2 text-lg font-bold text-slate-950">Complaints</h2>
+              </div>
+
+              <span className="text-xl text-slate-400 transition-transform duration-200 group-hover:translate-x-1 group-hover:text-slate-900">
+                →
+              </span>
+            </div>
+
+            <p className="mt-3 text-sm leading-6 text-slate-500">
+              Raise, track, and resolve maintenance issues and complaints.
+            </p>
+
+            <div className="mt-auto pt-6 text-sm font-semibold text-slate-900">
+              View complaints
+              <span className="ml-1 transition-transform group-hover:translate-x-1">→</span>
+            </div>
+          </Link>
+
+          {/* Contacts */}
+          <Link
+            to={`/societies/${society.id}/contacts`}
+            className="group flex h-full flex-col rounded-3xl border border-slate-200 bg-white p-7 shadow-[0_14px_45px_-28px_rgba(15,23,42,0.3)] transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_18px_50px_-25px_rgba(15,23,42,0.35)]"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">
+                  Services
+                </p>
+
+                <h2 className="mt-2 text-lg font-bold text-slate-950">Contacts directory</h2>
+              </div>
+
+              <span className="text-xl text-slate-400 transition-transform duration-200 group-hover:translate-x-1 group-hover:text-slate-900">
+                →
+              </span>
+            </div>
+
+            <p className="mt-3 text-sm leading-6 text-slate-500">
+              Find electricians, plumbers, cleaners, and other service providers.
+            </p>
+
+            <div className="mt-auto pt-6 text-sm font-semibold text-slate-900">
+              View contacts
               <span className="ml-1 transition-transform group-hover:translate-x-1">→</span>
             </div>
           </Link>
