@@ -16,6 +16,7 @@ import meetingRoutes from "./modules/meetings/meeting.routes.js";
 import complaintRoutes from "./modules/complaints/complaint.routes.js";
 import announcementRoutes from "./modules/announcements/announcement.routes.js";
 import maintenanceRoutes from "./modules/maintenance/maintenance.routes.js";
+import financeRoutes from "./modules/finance/finance.routes.js";
 
 import apiRouter from "./routes/index.js";
 
@@ -61,6 +62,8 @@ app.use("/api/v1/meetings", meetingRoutes);
 app.use("/api/v1/societies", announcementRoutes);
 
 app.use("/api/v1/societies", maintenanceRoutes);
+
+app.use("/api/v1/societies", financeRoutes);
 
 app.use(notFound);
 
