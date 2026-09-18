@@ -1099,10 +1099,6 @@ const getResidentMaintenanceBill = async ({ societyId, billId, flatId }) => {
 // EXPORTS
 // =====================================================
 //
-// IMPORTANT:
-// If you already have an export block from Part 1,
-// replace that block with this COMPLETE block.
-//
 
 export {
   createMaintenanceBill,
