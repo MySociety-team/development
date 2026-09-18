@@ -14,6 +14,9 @@ import SocietyMembersPage from "../modules/societies/pages/SocietyMembersPage.js
 import ContactsPage from "../modules/contacts/pages/ContactsPage.jsx";
 import CreateContactPage from "../modules/contacts/pages/CreateContactPage.jsx";
 
+import MaintenancePage from "../modules/maintenance/pages/MaintenancePage.jsx";
+import MaintenanceDashboardPage from "../modules/maintenance/pages/MaintenanceDashboardPage.jsx";
+
 import ComplaintsPage from "../modules/complaints/pages/ComplaintsPage.jsx";
 
 import SubscriptionPage from "../modules/subscriptions/pages/SubscriptionPage.jsx";
@@ -131,6 +134,16 @@ const router = createBrowserRouter([
           {
             path: "/societies/:societyId/complaints",
             element: <ComplaintsPage />
+          },
+
+          {
+            path: "/societies/:societyId/maintenance",
+            element: <MaintenancePage />
+          },
+
+          {
+            path: "/societies/:societyId/maintenance/dashboard",
+            element: <MaintenanceDashboardPage />
           },
 
           {
