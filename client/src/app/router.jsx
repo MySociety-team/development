@@ -32,6 +32,8 @@ import CreateAnnouncementPage from "../modules/announcements/pages/CreateAnnounc
 import AnnouncementDetailsPage from "../modules/announcements/pages/AnnouncementDetailsPage.jsx";
 import EditAnnouncementPage from "../modules/announcements/pages/EditAnnouncementPage.jsx";
 
+import FinancePage from "../modules/finance/pages/FinancePage.jsx";
+
 import NotFoundPage from "../pages/NotFoundPage.jsx";
 import RouteErrorPage from "../pages/RouteErrorPage.jsx";
 
@@ -144,6 +146,11 @@ const router = createBrowserRouter([
           {
             path: "/societies/:societyId/maintenance/dashboard",
             element: <MaintenanceDashboardPage />
+          },
+
+          {
+            path: "/societies/:societyId/finance",
+            element: <FinancePage />
           },
 
           {
