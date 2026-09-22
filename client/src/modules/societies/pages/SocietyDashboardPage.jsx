@@ -62,13 +62,33 @@ function SocietyDashboardPage() {
     };
   }, [societyId]);
 
+  const handleCopyCode = async () => {
+    if (!data?.society?.joiningCode) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(data.society.joiningCode);
+
+      setCopied(true);
+
+      setTimeout(() => {
+        setCopied(false);
+      }, 2000);
+    } catch (err) {
+      console.error("Failed to copy joining code:", err);
+    }
+  };
+
   if (loading) {
     return (
       <AppShell title="Society dashboard" backTo="/societies">
         <div className="mx-auto max-w-6xl">
           <div className="animate-pulse rounded-3xl border border-slate-200 bg-white p-8 shadow-[0_18px_50px_-28px_rgba(15,23,42,0.25)]">
             <div className="h-4 w-28 rounded-full bg-slate-200" />
+
             <div className="mt-4 h-8 w-64 rounded-lg bg-slate-200" />
+
             <div className="mt-3 h-4 w-96 max-w-full rounded bg-slate-100" />
 
             <div className="mt-8 grid gap-5 sm:grid-cols-3">
@@ -108,6 +128,8 @@ function SocietyDashboardPage() {
 
   const { society, membership } = data;
 
+  const isSecretary = membership?.role === "SECRETARY";
+
   return (
     <AppShell
       title={society.name}
@@ -116,77 +138,75 @@ function SocietyDashboardPage() {
       societyId={society.id}
     >
       <div className="mx-auto max-w-6xl space-y-7">
-        {/* Dashboard header */}
-        <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_20px_60px_-32px_rgba(15,23,42,0.35)]">
-          <div className="px-7 py-7 sm:px-8 sm:py-8">
-            <div className="flex flex-col justify-between gap-6 sm:flex-row sm:items-start">
-              <div className="max-w-2xl">
-                <div className="mb-4 flex items-center gap-2">
-                  <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.14em] text-slate-600">
-                    Society dashboard
-                  </span>
+        {/* =====================================================
+            SOCIETY HEADER
+        ===================================================== */}
 
-                  <span className="h-1 w-1 rounded-full bg-slate-300" />
+        <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_20px_60px_-32px_rgba(15,23,42,0.3)]">
+          <div className="border-b border-slate-100 px-7 py-7">
+            <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">
+                  Society
+                </p>
 
-                  <span className="text-xs font-medium text-slate-400">{membership.role}</span>
-                </div>
-
-                <h1 className="text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">
+                <h2 className="mt-2 text-2xl font-bold tracking-tight text-slate-950">
                   {society.name}
-                </h1>
+                </h2>
 
                 <p className="mt-2 text-sm leading-6 text-slate-500">{society.address}</p>
               </div>
 
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-5 py-4 sm:min-w-[190px]">
+              <div className="rounded-2xl bg-slate-950 px-5 py-4 text-white">
                 <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-400">
                   Your role
                 </p>
 
-                <p className="mt-1.5 text-sm font-bold text-slate-900">{membership.role}</p>
+                <p className="mt-1 text-sm font-bold">{membership.role}</p>
               </div>
             </div>
+          </div>
 
-            {/* Quick stats */}
-            <div className="mt-8 grid gap-3 sm:grid-cols-3">
-              <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-                <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-400">
-                  Total flats
-                </p>
+          {/* Quick information */}
+          <div className="grid gap-px bg-slate-100 sm:grid-cols-3">
+            <div className="bg-white px-7 py-6">
+              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
+                Your flat
+              </p>
 
-                <p className="mt-2 text-2xl font-bold tracking-tight text-slate-950">
-                  {society.numberOfFlats}
-                </p>
+              <p className="mt-2 text-xl font-bold text-slate-950">
+                {membership.flat?.wing} {membership.flat?.flatNumber}
+              </p>
 
-                <p className="mt-1 text-xs text-slate-500">Registered in society</p>
-              </div>
+              <p className="mt-1 text-xs text-slate-500">{membership.flat?.flatType}</p>
+            </div>
 
-              <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-                <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-400">
-                  Your flat
-                </p>
+            <div className="bg-white px-7 py-6">
+              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
+                Member type
+              </p>
 
-                <p className="mt-2 text-2xl font-bold tracking-tight text-slate-950">
-                  {membership.flat?.wing} {membership.flat?.flatNumber}
-                </p>
+              <p className="mt-2 text-xl font-bold text-slate-950">{membership.memberType}</p>
 
-                <p className="mt-1 text-xs text-slate-500">{membership.flat?.flatType}</p>
-              </div>
+              <p className="mt-1 text-xs text-slate-500">Current membership</p>
+            </div>
 
-              <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-                <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-400">
-                  Member type
-                </p>
+            <div className="bg-white px-7 py-6">
+              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
+                Total flats
+              </p>
 
-                <p className="mt-2 text-lg font-bold text-slate-950">{membership.memberType}</p>
+              <p className="mt-2 text-xl font-bold text-slate-950">{society.numberOfFlats}</p>
 
-                <p className="mt-1 text-xs text-slate-500">Current membership</p>
-              </div>
+              <p className="mt-1 text-xs text-slate-500">Registered in society</p>
             </div>
           </div>
         </section>
 
-        {/* Main content */}
+        {/* =====================================================
+            JOINING CODE + FLAT DETAILS
+        ===================================================== */}
+
         <div className="grid gap-7 lg:grid-cols-[1.35fr_0.65fr]">
           {/* Joining code */}
           <section className="flex h-full flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_14px_45px_-28px_rgba(15,23,42,0.3)]">
@@ -231,9 +251,11 @@ function SocietyDashboardPage() {
                     {copied ? (
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
-                        className="h-5 w-5 text-emerald-600"
-                        viewBox="0 0 20 20"
-                        fill="currentColor"
+                        className="h-4 w-4 text-emerald-600"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2.5}
                       >
                         <path
                           fillRule="evenodd"
@@ -244,7 +266,7 @@ function SocietyDashboardPage() {
                     ) : (
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
-                        className="h-5 w-5"
+                        className="h-4 w-4"
                         fill="none"
                         viewBox="0 0 24 24"
                         stroke="currentColor"
@@ -253,7 +275,7 @@ function SocietyDashboardPage() {
                         <path
                           strokeLinecap="round"
                           strokeLinejoin="round"
-                          d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                          d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 00-2-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3"
                         />
                       </svg>
                     )}
@@ -275,82 +297,47 @@ function SocietyDashboardPage() {
 
           {/* Your flat */}
           <section className="flex h-full flex-col rounded-3xl border border-slate-200 bg-white p-7 shadow-[0_14px_45px_-28px_rgba(15,23,42,0.3)]">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">
-                  Your residence
-                </p>
-
-                <h2 className="mt-2 text-lg font-bold text-slate-950">Your flat</h2>
-              </div>
-
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-sm font-bold text-slate-700">
-                {membership.flat?.wing}
-              </div>
-            </div>
-
-            <div className="mt-6 rounded-2xl bg-slate-950 p-5">
-              <p className="text-xs font-medium text-slate-400">Flat number</p>
-
-              <p className="mt-1 text-3xl font-bold tracking-tight text-white">
-                {membership.flat?.wing} {membership.flat?.flatNumber}
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">
+                Your flat
               </p>
 
-              <p className="mt-2 text-sm text-slate-400">{membership.flat?.flatType}</p>
+              <h2 className="mt-2 text-xl font-bold text-slate-950">
+                {membership.flat?.wing} {membership.flat?.flatNumber}
+              </h2>
+
+              <p className="mt-1 text-sm text-slate-500">{membership.flat?.flatType}</p>
             </div>
 
-            <dl className="mt-5 divide-y divide-slate-100">
-              <div className="flex items-center justify-between gap-4 py-3">
+            <dl className="mt-6 divide-y divide-slate-100 border-y border-slate-100">
+              <div className="flex items-center justify-between gap-4 py-4">
                 <dt className="text-sm text-slate-500">Floor</dt>
                 <dd className="text-sm font-semibold text-slate-900">{membership.flat?.floor}</dd>
               </div>
 
-              <div className="flex items-center justify-between gap-4 py-3">
+              <div className="flex items-center justify-between gap-4 py-4">
                 <dt className="text-sm text-slate-500">Type</dt>
                 <dd className="text-sm font-semibold text-slate-900">
                   {membership.flat?.flatType}
                 </dd>
               </div>
 
-              <div className="flex items-center justify-between gap-4 py-3">
+              <div className="flex items-center justify-between gap-4 py-4">
+                <dt className="text-sm text-slate-500">Member type</dt>
+
+                <dd className="text-sm font-semibold text-slate-900">{membership.memberType}</dd>
+              </div>
+
+              <div className="flex items-center justify-between gap-4 py-4">
                 <dt className="text-sm text-slate-500">Mobile</dt>
-                <dd className="text-sm font-semibold text-slate-900">{membership.mobileNumber}</dd>
-              </div>
-            </dl>
-          </section>
 
-          {/* Society information */}
-          <section className="rounded-3xl border border-slate-200 bg-white p-7 shadow-[0_14px_45px_-28px_rgba(15,23,42,0.3)]">
-            <div className="flex items-start gap-3">
-              <div className="mt-1 h-6 w-1 shrink-0 rounded-full bg-slate-900" />
-
-              <div>
-                <h2 className="text-lg font-bold text-slate-950">Society information</h2>
-
-                <p className="mt-1 text-sm text-slate-500">
-                  Basic information and facilities available in your society.
-                </p>
-              </div>
-            </div>
-
-            <dl className="mt-7 grid gap-4 sm:grid-cols-2">
-              <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
-                <dt className="text-[10px] font-bold uppercase tracking-[0.13em] text-slate-400">
-                  Total flats
-                </dt>
-
-                <dd className="mt-2 text-xl font-bold text-slate-950">{society.numberOfFlats}</dd>
-              </div>
-
-              <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
-                <dt className="text-[10px] font-bold uppercase tracking-[0.13em] text-slate-400">
-                  Your member type
-                </dt>
-
-                <dd className="mt-2 text-xl font-bold text-slate-950">{membership.memberType}</dd>
+                <dd className="text-sm font-semibold text-slate-900">
+                  {membership.mobileNumber || "—"}
+                </dd>
               </div>
             </dl>
 
+            {/* Facilities */}
             <div className="mt-7 border-t border-slate-100 pt-6">
               <div className="flex items-center justify-between gap-4">
                 <div>
@@ -360,11 +347,11 @@ function SocietyDashboardPage() {
                 </div>
 
                 <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
-                  {society.facilities.length}
+                  {society.facilities?.length || 0}
                 </span>
               </div>
 
-              {society.facilities.length === 0 ? (
+              {!society.facilities || society.facilities.length === 0 ? (
                 <div className="mt-4 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-4 text-sm text-slate-500">
                   No facilities have been added.
                 </div>
@@ -386,11 +373,87 @@ function SocietyDashboardPage() {
               )}
             </div>
           </section>
+        </div>
 
-          {/* Meetings */}
+        {/* =====================================================
+            MAIN FEATURE GRID
+        ===================================================== */}
+
+        <div className="grid gap-6 md:grid-cols-2">
+          {/* =================================================
+              MAINTENANCE - SECRETARY MANAGEMENT
+          ================================================= */}
+
+          {isSecretary && (
+            <Link
+              to={`/societies/${society.id}/maintenance/dashboard`}
+              className="group flex h-full min-h-[230px] flex-col rounded-3xl border border-slate-200 bg-white p-7 shadow-[0_14px_45px_-28px_rgba(15,23,42,0.3)] transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_18px_50px_-25px_rgba(15,23,42,0.35)]"
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">
+                    Secretary
+                  </p>
+
+                  <h2 className="mt-2 text-lg font-bold text-slate-950">Manage Maintenance</h2>
+                </div>
+
+                <span className="text-xl text-slate-400 transition-transform duration-200 group-hover:translate-x-1 group-hover:text-slate-900">
+                  →
+                </span>
+              </div>
+
+              <p className="mt-3 text-sm leading-6 text-slate-500">
+                Generate bills, manage payments, mark overdue bills, and view maintenance reports.
+              </p>
+
+              <div className="mt-auto pt-6 text-sm font-semibold text-slate-900">
+                Open Dashboard
+                <span className="ml-1">→</span>
+              </div>
+            </Link>
+          )}
+
+          {/* =================================================
+              MY MAINTENANCE
+          ================================================= */}
+
+          <Link
+            to={`/societies/${society.id}/maintenance`}
+            className="group flex h-full min-h-[230px] flex-col rounded-3xl border border-slate-200 bg-white p-7 shadow-[0_14px_45px_-28px_rgba(15,23,42,0.3)] transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_18px_50px_-25px_rgba(15,23,42,0.35)]"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">
+                  {isSecretary ? "My Flat" : "Resident"}
+                </p>
+
+                <h2 className="mt-2 text-lg font-bold text-slate-950">My Maintenance</h2>
+              </div>
+
+              <span className="text-xl text-slate-400 transition-transform duration-200 group-hover:translate-x-1 group-hover:text-slate-900">
+                →
+              </span>
+            </div>
+
+            <p className="mt-3 text-sm leading-6 text-slate-500">
+              View your maintenance bill, outstanding dues, payment history, and pay your bill
+              online.
+            </p>
+
+            <div className="mt-auto pt-6 text-sm font-semibold text-slate-900">
+              View My Bill
+              <span className="ml-1">→</span>
+            </div>
+          </Link>
+
+          {/* =================================================
+              MEETINGS
+          ================================================= */}
+
           <Link
             to={`/societies/${society.id}/meetings`}
-            className="group flex h-full flex-col rounded-3xl border border-slate-200 bg-white p-7 shadow-[0_14px_45px_-28px_rgba(15,23,42,0.3)] transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_18px_50px_-25px_rgba(15,23,42,0.35)]"
+            className="group flex h-full min-h-[230px] flex-col rounded-3xl border border-slate-200 bg-white p-7 shadow-[0_14px_45px_-28px_rgba(15,23,42,0.3)] transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_18px_50px_-25px_rgba(15,23,42,0.35)]"
           >
             <div className="flex items-start justify-between gap-4">
               <div>
@@ -412,14 +475,17 @@ function SocietyDashboardPage() {
 
             <div className="mt-auto pt-6 text-sm font-semibold text-slate-900">
               View meetings
-              <span className="ml-1 transition-transform group-hover:translate-x-1">→</span>
+              <span className="ml-1">→</span>
             </div>
           </Link>
 
-          {/* Announcements */}
+          {/* =================================================
+              ANNOUNCEMENTS
+          ================================================= */}
+
           <Link
             to={`/societies/${society.id}/announcements`}
-            className="group flex h-full flex-col rounded-3xl border border-slate-200 bg-white p-7 shadow-[0_14px_45px_-28px_rgba(15,23,42,0.3)] transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_18px_50px_-25px_rgba(15,23,42,0.35)]"
+            className="group flex h-full min-h-[230px] flex-col rounded-3xl border border-slate-200 bg-white p-7 shadow-[0_14px_45px_-28px_rgba(15,23,42,0.3)] transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_18px_50px_-25px_rgba(15,23,42,0.35)]"
           >
             <div className="flex items-start justify-between gap-4">
               <div>
@@ -441,14 +507,17 @@ function SocietyDashboardPage() {
 
             <div className="mt-auto pt-6 text-sm font-semibold text-slate-900">
               View announcements
-              <span className="ml-1 transition-transform group-hover:translate-x-1">→</span>
+              <span className="ml-1">→</span>
             </div>
           </Link>
 
-          {/* Society members */}
+          {/* =================================================
+              SOCIETY MEMBERS
+          ================================================= */}
+
           <Link
             to={`/societies/${society.id}/members`}
-            className="group flex h-full flex-col rounded-3xl border border-slate-200 bg-white p-7 shadow-[0_14px_45px_-28px_rgba(15,23,42,0.3)] transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_18px_50px_-25px_rgba(15,23,42,0.35)]"
+            className="group flex h-full min-h-[230px] flex-col rounded-3xl border border-slate-200 bg-white p-7 shadow-[0_14px_45px_-28px_rgba(15,23,42,0.3)] transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_18px_50px_-25px_rgba(15,23,42,0.35)]"
           >
             <div className="flex items-start justify-between gap-4">
               <div>
@@ -456,7 +525,7 @@ function SocietyDashboardPage() {
                   Community
                 </p>
 
-                <h2 className="mt-2 text-lg font-bold text-slate-950">Society members</h2>
+                <h2 className="mt-2 text-lg font-bold text-slate-950">Society Members</h2>
               </div>
 
               <span className="text-xl text-slate-400 transition-transform duration-200 group-hover:translate-x-1 group-hover:text-slate-900">
@@ -470,14 +539,17 @@ function SocietyDashboardPage() {
 
             <div className="mt-auto pt-6 text-sm font-semibold text-slate-900">
               View members
-              <span className="ml-1 transition-transform group-hover:translate-x-1">→</span>
+              <span className="ml-1">→</span>
             </div>
           </Link>
 
-          {/* Complaints helpdesk */}
+          {/* =================================================
+              COMPLAINTS
+          ================================================= */}
+
           <Link
             to={`/societies/${society.id}/complaints`}
-            className="group flex h-full flex-col rounded-3xl border border-slate-200 bg-white p-7 shadow-[0_14px_45px_-28px_rgba(15,23,42,0.3)] transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_18px_50px_-25px_rgba(15,23,42,0.35)]"
+            className="group flex h-full min-h-[230px] flex-col rounded-3xl border border-slate-200 bg-white p-7 shadow-[0_14px_45px_-28px_rgba(15,23,42,0.3)] transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_18px_50px_-25px_rgba(15,23,42,0.35)]"
           >
             <div className="flex items-start justify-between gap-4">
               <div>
@@ -485,7 +557,7 @@ function SocietyDashboardPage() {
                   Helpdesk
                 </p>
 
-                <h2 className="mt-2 text-lg font-bold text-slate-950">Complaints helpdesk</h2>
+                <h2 className="mt-2 text-lg font-bold text-slate-950">Complaints Helpdesk</h2>
               </div>
 
               <span className="text-xl text-slate-400 transition-transform duration-200 group-hover:translate-x-1 group-hover:text-slate-900">
@@ -498,15 +570,18 @@ function SocietyDashboardPage() {
             </p>
 
             <div className="mt-auto pt-6 text-sm font-semibold text-slate-900">
-              View complaints
-              <span className="ml-1 transition-transform group-hover:translate-x-1">→</span>
+              Go to complaints
+              <span className="ml-1">→</span>
             </div>
           </Link>
 
-          {/* Society contacts */}
+          {/* =================================================
+              CONTACTS
+          ================================================= */}
+
           <Link
             to={`/societies/${society.id}/contacts`}
-            className="group flex h-full flex-col rounded-3xl border border-slate-200 bg-white p-7 shadow-[0_14px_45px_-28px_rgba(15,23,42,0.3)] transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_18px_50px_-25px_rgba(15,23,42,0.35)]"
+            className="group flex h-full min-h-[230px] flex-col rounded-3xl border border-slate-200 bg-white p-7 shadow-[0_14px_45px_-28px_rgba(15,23,42,0.3)] transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_18px_50px_-25px_rgba(15,23,42,0.35)]"
           >
             <div className="flex items-start justify-between gap-4">
               <div>
@@ -514,7 +589,7 @@ function SocietyDashboardPage() {
                   Directory
                 </p>
 
-                <h2 className="mt-2 text-lg font-bold text-slate-950">Society contacts</h2>
+                <h2 className="mt-2 text-lg font-bold text-slate-950">Society Contacts</h2>
               </div>
 
               <span className="text-xl text-slate-400 transition-transform duration-200 group-hover:translate-x-1 group-hover:text-slate-900">
@@ -529,7 +604,38 @@ function SocietyDashboardPage() {
 
             <div className="mt-auto pt-6 text-sm font-semibold text-slate-900">
               View contacts
-              <span className="ml-1 transition-transform group-hover:translate-x-1">→</span>
+              <span className="ml-1">→</span>
+            </div>
+          </Link>
+          {/* =================================================
+    FINANCE
+================================================= */}
+
+          <Link
+            to={`/societies/${society.id}/finance`}
+            className="group flex h-full min-h-[230px] flex-col rounded-3xl border border-slate-200 bg-white p-7 shadow-[0_14px_45px_-28px_rgba(15,23,42,0.3)] transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_18px_50px_-25px_rgba(15,23,42,0.35)]"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">
+                  Society
+                </p>
+
+                <h2 className="mt-2 text-lg font-bold text-slate-950">Finance</h2>
+              </div>
+
+              <span className="text-xl text-slate-400 transition-transform duration-200 group-hover:translate-x-1 group-hover:text-slate-900">
+                →
+              </span>
+            </div>
+
+            <p className="mt-3 text-sm leading-6 text-slate-500">
+              View society income, expenses, transactions, and current financial balance.
+            </p>
+
+            <div className="mt-auto pt-6 text-sm font-semibold text-slate-900">
+              View Finance
+              <span className="ml-1">→</span>
             </div>
           </Link>
         </div>

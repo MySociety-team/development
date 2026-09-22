@@ -1,6 +1,9 @@
 import User from "../models/User.js";
+
 import ApiError from "../utils/apiError.js";
+
 import asyncHandler from "../utils/asyncHandler.js";
+
 import { verifyJwt } from "../utils/jwt.js";
 
 const extractBearerToken = (authorizationHeader) => {
@@ -64,4 +67,5 @@ const authenticate = asyncHandler(async (req, res, next) => {
 });
 
 export { extractBearerToken };
+
 export default authenticate;
