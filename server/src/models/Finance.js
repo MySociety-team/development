@@ -11,6 +11,13 @@ const financeSchema = new Schema(
       index: true
     },
 
+    flatId: {
+      type: Schema.Types.ObjectId,
+      ref: "Flat",
+      default: null,
+      index: true
+    },
+
     title: {
       type: String,
       required: [true, "Title is Required"],
@@ -56,7 +63,7 @@ const financeSchema = new Schema(
       type: String,
       required: [true, "Payment Method is Required"],
       enum: {
-        values: ["CASH", "UPI", "BANK_TRANSFER", "CARD", "OTHER"],
+        values: ["CASH", "UPI", "BANK_TRANSFER", "CARD", "RAZORPAY", "OTHER"],
         message: "Payment Method must be CASH, UPI, BANK_TRANSFER, CARD or OTHER"
       }
     },
@@ -71,6 +78,20 @@ const financeSchema = new Schema(
       type: Schema.Types.ObjectId,
       ref: "User",
       required: [true, "Created By is Required"]
+    },
+
+    // Used to connect automatically-created
+    // Finance records with their source record.
+    sourceType: {
+      type: String,
+      trim: true,
+      default: null
+    },
+
+    sourcePaymentId: {
+      type: Schema.Types.ObjectId,
+      ref: "MaintenancePayment",
+      default: null
     }
   },
   {
@@ -81,6 +102,20 @@ const financeSchema = new Schema(
 financeSchema.index({ societyId: 1, type: 1 });
 financeSchema.index({ societyId: 1, date: -1 });
 financeSchema.index({ societyId: 1, category: 1 });
+financeSchema.index({ societyId: 1, flatId: 1 });
+
+// Prevent duplicate Finance entries for the same
+// MaintenancePayment.
+financeSchema.index(
+  {
+    sourceType: 1,
+    sourcePaymentId: 1
+  },
+  {
+    unique: true,
+    sparse: true
+  }
+);
 
 const Finance = mongoose.model("Finance", financeSchema);
 

@@ -241,7 +241,9 @@ const recordOffline = asyncHandler(async (req, res) => {
 
     paymentDate,
 
-    transactionId
+    transactionId,
+
+    userId: req.user.id
   });
 
   res.status(201).json({
@@ -435,7 +437,9 @@ const verifyPayment = asyncHandler(async (req, res) => {
 
     razorpayPaymentId: req.body.razorpay_payment_id,
 
-    razorpaySignature: req.body.razorpay_signature
+    razorpaySignature: req.body.razorpay_signature,
+
+    userId: req.user.id
   });
 
   res.status(200).json({

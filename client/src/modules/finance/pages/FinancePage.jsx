@@ -37,8 +37,7 @@ const expenseCategories = [
   "Other"
 ];
 
-const paymentMethods = ["CASH", "UPI", "BANK_TRANSFER", "CARD", "OTHER"];
-
+const paymentMethods = ["CASH", "UPI", "BANK_TRANSFER", "CARD", "RAZORPAY", "OTHER"];
 const formatAmount = (amount) =>
   new Intl.NumberFormat("en-IN", {
     style: "currency",
@@ -648,6 +647,13 @@ function FinancePage() {
                           Category: <strong className="text-slate-700">{record.category}</strong>
                         </span>
 
+                        {record.flatId?.flatNumber && (
+                          <span>
+                            Flat:{" "}
+                            <strong className="text-slate-700">{record.flatId.flatNumber}</strong>
+                          </span>
+                        )}
+
                         <span>
                           Payment:{" "}
                           <strong className="text-slate-700">
@@ -656,6 +662,7 @@ function FinancePage() {
                         </span>
 
                         <span>{formatDate(record.date)}</span>
+
                         {record.documentUrl && (
                           <button
                             type="button"

@@ -2,7 +2,7 @@ import crypto from "crypto";
 import Flat from "../../models/Flat.js";
 import MaintenanceBill from "../../models/MaintenanceBill.js";
 import getRazorpayClient from "../../config/razorpay.js";
-
+import { createMaintenanceIncome } from "../finance/finance.service.js";
 import {
   createBill,
   createBills,
@@ -554,14 +554,14 @@ const getPayment = async ({ societyId, paymentId, flatId, role }) => {
 // =====================================================
 // RECORD OFFLINE PAYMENT
 // =====================================================
-
 const recordOfflinePayment = async ({
   societyId,
   billId,
   amount,
   paymentMethod,
   paymentDate,
-  transactionId
+  transactionId,
+  userId
 }) => {
   const bill = await findBillById(societyId, billId);
 
@@ -629,6 +629,15 @@ const recordOfflinePayment = async ({
   // -------------------------------------------------
 
   await updateBillStatus(societyId, billId, "PAID", billAmount);
+
+  // Automatically create Finance income
+  // after successful maintenance payment.
+  await createMaintenanceIncome({
+    societyId,
+    payment,
+    bill,
+    userId
+  });
 
   return payment;
 };
@@ -919,7 +928,8 @@ const verifyMaintenancePayment = async ({
   role,
   razorpayOrderId,
   razorpayPaymentId,
-  razorpaySignature
+  razorpaySignature,
+  userId
 }) => {
   const bill = await findBillById(societyId, billId);
 
@@ -1057,6 +1067,15 @@ const verifyMaintenancePayment = async ({
   // -------------------------------------------------
 
   await updateBillStatus(societyId, billId, "PAID", Number(bill.totalAmount || 0));
+
+  // Automatically create Finance income
+  // after successful Razorpay payment.
+  await createMaintenanceIncome({
+    societyId,
+    payment: updatedPayment,
+    bill,
+    userId
+  });
 
   return updatedPayment;
 };
