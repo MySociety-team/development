@@ -1,7 +1,6 @@
 const allowedTypes = ["INCOME", "EXPENSE"];
 
-const allowedPaymentMethods = ["CASH", "UPI", "BANK_TRANSFER", "CARD", "OTHER"];
-
+const allowedPaymentMethods = ["CASH", "UPI", "BANK_TRANSFER", "CARD", "RAZORPAY", "OTHER"];
 export const validateFinanceCreate = (data) => {
   const errors = {};
 
