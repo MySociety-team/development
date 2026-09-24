@@ -64,7 +64,7 @@ const financeSchema = new Schema(
       required: [true, "Payment Method is Required"],
       enum: {
         values: ["CASH", "UPI", "BANK_TRANSFER", "CARD", "RAZORPAY", "OTHER"],
-        message: "Payment Method must be CASH, UPI, BANK_TRANSFER, CARD or OTHER"
+        message: "Payment Method must be CASH, UPI, BANK_TRANSFER, CARD, RAZORPAY or OTHER"
       }
     },
 
@@ -84,14 +84,12 @@ const financeSchema = new Schema(
     // Finance records with their source record.
     sourceType: {
       type: String,
-      trim: true,
-      default: null
+      trim: true
     },
 
     sourcePaymentId: {
       type: Schema.Types.ObjectId,
-      ref: "MaintenancePayment",
-      default: null
+      ref: "MaintenancePayment"
     }
   },
   {
@@ -104,8 +102,8 @@ financeSchema.index({ societyId: 1, date: -1 });
 financeSchema.index({ societyId: 1, category: 1 });
 financeSchema.index({ societyId: 1, flatId: 1 });
 
-// Prevent duplicate Finance entries for the same
-// MaintenancePayment.
+// Prevent duplicate Finance entries for the same MaintenancePayment.
+// Normal Finance records do not contain these fields.
 financeSchema.index(
   {
     sourceType: 1,

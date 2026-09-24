@@ -78,7 +78,19 @@ export const updateFinance = async ({ societyId, financeId, data }) => {
   if (!mongoose.isValidObjectId(financeId)) {
     throw new ApiError(400, "FINANCE_ID_INVALID", "Finance ID is invalid");
   }
+  const existingFinance = await findFinanceById(financeId, societyId);
 
+  if (!existingFinance) {
+    throw new ApiError(404, "FINANCE_NOT_FOUND", "Finance record not found");
+  }
+
+  if (existingFinance.sourceType === "MAINTENANCE_PAYMENT") {
+    throw new ApiError(
+      400,
+      "MAINTENANCE_FINANCE_PROTECTED",
+      "Maintenance finance records cannot be edited"
+    );
+  }
   const errors = validateFinanceUpdate(data);
 
   if (Object.keys(errors).length > 0) {
@@ -107,6 +119,20 @@ export const deleteFinance = async ({ societyId, financeId }) => {
 
   if (!mongoose.isValidObjectId(financeId)) {
     throw new ApiError(400, "FINANCE_ID_INVALID", "Finance ID is invalid");
+  }
+
+  const existingFinance = await findFinanceById(financeId, societyId);
+
+  if (!existingFinance) {
+    throw new ApiError(404, "FINANCE_NOT_FOUND", "Finance record not found");
+  }
+
+  if (existingFinance.sourceType === "MAINTENANCE_PAYMENT") {
+    throw new ApiError(
+      400,
+      "MAINTENANCE_FINANCE_PROTECTED",
+      "Maintenance finance records cannot be deleted"
+    );
   }
 
   const finance = await deleteFinanceRecord(financeId, societyId);

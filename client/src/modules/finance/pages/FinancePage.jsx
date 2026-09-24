@@ -24,8 +24,7 @@ const initialForm = {
   documentUrl: ""
 };
 
-const incomeCategories = ["Society Fund", "Donation", "Other Income"];
-
+const incomeCategories = ["Society Fund", "Donation", "Maintenance", "Other Income"];
 const expenseCategories = [
   "Electricity",
   "Water",
@@ -38,6 +37,7 @@ const expenseCategories = [
 ];
 
 const paymentMethods = ["CASH", "UPI", "BANK_TRANSFER", "CARD", "RAZORPAY", "OTHER"];
+
 const formatAmount = (amount) =>
   new Intl.NumberFormat("en-IN", {
     style: "currency",
@@ -69,6 +69,7 @@ function FinancePage() {
   const [successMessage, setSuccessMessage] = useState("");
 
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
 
@@ -85,19 +86,36 @@ function FinancePage() {
     return form.type === "INCOME" ? incomeCategories : expenseCategories;
   }, [form.type]);
 
+  const hasActiveFilters = Boolean(search || typeFilter || categoryFilter);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  const clearFilters = () => {
+    setSearch("");
+    setDebouncedSearch("");
+    setTypeFilter("");
+    setCategoryFilter("");
+  };
+
   const refreshFinance = useCallback(async () => {
     const [financeRecords, financeSummary] = await Promise.all([
       getFinanceRecords(societyId, {
         type: typeFilter,
         category: categoryFilter,
-        search
+        search: debouncedSearch
       }),
       getFinanceSummary(societyId)
     ]);
 
     setRecords(financeRecords);
     setSummary(financeSummary);
-  }, [societyId, typeFilter, categoryFilter, search]);
+  }, [societyId, typeFilter, categoryFilter, debouncedSearch]);
 
   useEffect(() => {
     let cancelled = false;
@@ -112,7 +130,7 @@ function FinancePage() {
           getFinanceRecords(societyId, {
             type: typeFilter,
             category: categoryFilter,
-            search
+            search: debouncedSearch
           }),
           getFinanceSummary(societyId)
         ]);
@@ -140,7 +158,7 @@ function FinancePage() {
     return () => {
       cancelled = true;
     };
-  }, [societyId, typeFilter, categoryFilter, search]);
+  }, [societyId, typeFilter, categoryFilter, debouncedSearch]);
 
   const handleFormChange = (event) => {
     const { name, value } = event.target;
@@ -185,6 +203,10 @@ function FinancePage() {
   };
 
   const handleEdit = (record) => {
+    if (record.sourceType === "MAINTENANCE_PAYMENT") {
+      return;
+    }
+
     setEditingRecord(record);
 
     setForm({
@@ -198,12 +220,16 @@ function FinancePage() {
       documentUrl: record.documentUrl || ""
     });
 
-    setShowForm(true);
+    setShowForm(false);
     setSuccessMessage("");
     setErrorMessage("");
   };
 
   const openDeleteDialog = (record) => {
+    if (record.sourceType === "MAINTENANCE_PAYMENT") {
+      return;
+    }
+
     setDeleteRecord(record);
     setErrorMessage("");
     setSuccessMessage("");
@@ -225,6 +251,12 @@ function FinancePage() {
 
   const handleDelete = async () => {
     if (!deleteRecord) {
+      return;
+    }
+
+    if (deleteRecord.sourceType === "MAINTENANCE_PAYMENT") {
+      setDeleteRecord(null);
+      setErrorMessage("Maintenance finance records cannot be deleted.");
       return;
     }
 
@@ -383,7 +415,7 @@ function FinancePage() {
 
         {/* FORM */}
 
-        {showForm && isSecretary && (
+        {showForm && isSecretary && !editingRecord && (
           <section className="rounded-3xl border border-slate-200 bg-white p-7 shadow-sm">
             <div className="flex items-center justify-between gap-4">
               <div>
@@ -554,7 +586,7 @@ function FinancePage() {
         {/* FILTERS */}
 
         <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="grid gap-4 md:grid-cols-[1fr_180px_180px]">
+          <div className="grid gap-4 md:grid-cols-[1fr_180px_180px_auto]">
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
@@ -587,6 +619,16 @@ function FinancePage() {
                   </option>
                 ))}
             </select>
+
+            {hasActiveFilters && (
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                Clear Filters
+              </button>
+            )}
           </div>
         </section>
 
@@ -617,99 +659,125 @@ function FinancePage() {
                   ? "Add an income or expense transaction to get started."
                   : "There are currently no finance records for this society."}
               </p>
+
+              {hasActiveFilters && (
+                <button
+                  type="button"
+                  onClick={clearFilters}
+                  className="mt-4 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                >
+                  Clear Filters
+                </button>
+              )}
             </div>
           ) : (
             <div className="divide-y divide-slate-100">
-              {records.map((record) => (
-                <div key={record._id} className="px-7 py-6 transition hover:bg-slate-50">
-                  <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="font-semibold text-slate-950">{record.title}</h3>
+              {records.map((record) => {
+                const isMaintenanceRecord = record.sourceType === "MAINTENANCE_PAYMENT";
 
-                        <span
-                          className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-                            record.type === "INCOME"
-                              ? "bg-emerald-50 text-emerald-700"
-                              : "bg-red-50 text-red-700"
+                return (
+                  <div key={record._id} className="px-7 py-6 transition hover:bg-slate-50">
+                    <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="font-semibold text-slate-950">{record.title}</h3>
+
+                          <span
+                            className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                              record.type === "INCOME"
+                                ? "bg-emerald-50 text-emerald-700"
+                                : "bg-red-50 text-red-700"
+                            }`}
+                          >
+                            {record.type}
+                          </span>
+
+                          {isMaintenanceRecord && (
+                            <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
+                              Maintenance
+                            </span>
+                          )}
+                        </div>
+
+                        <p className="mt-2 text-sm text-slate-500">
+                          {record.description || "No description provided."}
+                        </p>
+
+                        <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-xs text-slate-500">
+                          <span>
+                            Category: <strong className="text-slate-700">{record.category}</strong>
+                          </span>
+
+                          {record.flatId?.flatNumber && (
+                            <span>
+                              Flat:{" "}
+                              <strong className="text-slate-700">{record.flatId.flatNumber}</strong>
+                            </span>
+                          )}
+
+                          {isMaintenanceRecord && (
+                            <span>
+                              Source: <strong className="text-slate-700">Maintenance</strong>
+                            </span>
+                          )}
+
+                          <span>
+                            Payment:{" "}
+                            <strong className="text-slate-700">
+                              {record.paymentMethod.replaceAll("_", " ")}
+                            </strong>
+                          </span>
+
+                          <span>{formatDate(record.date)}</span>
+
+                          {record.documentUrl && (
+                            <button
+                              type="button"
+                              onClick={() => openDocumentPreview(record)}
+                              className="font-semibold text-slate-700 underline decoration-slate-300 underline-offset-2 hover:text-slate-950"
+                            >
+                              View Document
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex shrink-0 flex-col items-start gap-3 lg:items-end">
+                        <p
+                          className={`text-lg font-bold ${
+                            record.type === "INCOME" ? "text-emerald-700" : "text-red-700"
                           }`}
                         >
-                          {record.type}
-                        </span>
-                      </div>
+                          {record.type === "INCOME" ? "+" : "-"}
+                          {formatAmount(record.amount)}
+                        </p>
 
-                      <p className="mt-2 text-sm text-slate-500">
-                        {record.description || "No description provided."}
-                      </p>
+                        {isSecretary && !isMaintenanceRecord && (
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleEdit(record)}
+                              disabled={actionLoading}
+                              className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-xs font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              Edit
+                            </button>
 
-                      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-xs text-slate-500">
-                        <span>
-                          Category: <strong className="text-slate-700">{record.category}</strong>
-                        </span>
-
-                        {record.flatId?.flatNumber && (
-                          <span>
-                            Flat:{" "}
-                            <strong className="text-slate-700">{record.flatId.flatNumber}</strong>
-                          </span>
-                        )}
-
-                        <span>
-                          Payment:{" "}
-                          <strong className="text-slate-700">
-                            {record.paymentMethod.replaceAll("_", " ")}
-                          </strong>
-                        </span>
-
-                        <span>{formatDate(record.date)}</span>
-
-                        {record.documentUrl && (
-                          <button
-                            type="button"
-                            onClick={() => openDocumentPreview(record)}
-                            className="font-semibold text-slate-700 underline decoration-slate-300 underline-offset-2 hover:text-slate-950"
-                          >
-                            View Document
-                          </button>
+                            <button
+                              type="button"
+                              onClick={() => openDeleteDialog(record)}
+                              disabled={actionLoading}
+                              className="rounded-lg border border-red-200 bg-white px-4 py-2 text-xs font-semibold text-red-600 transition hover:border-red-300 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              Delete
+                            </button>
+                          </div>
                         )}
                       </div>
-                    </div>
-
-                    <div className="flex shrink-0 flex-col items-start gap-3 lg:items-end">
-                      <p
-                        className={`text-lg font-bold ${
-                          record.type === "INCOME" ? "text-emerald-700" : "text-red-700"
-                        }`}
-                      >
-                        {record.type === "INCOME" ? "+" : "-"}
-                        {formatAmount(record.amount)}
-                      </p>
-
-                      {isSecretary && (
-                        <div className="flex gap-2">
-                          <button
-                            type="button"
-                            onClick={() => handleEdit(record)}
-                            disabled={actionLoading}
-                            className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-xs font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-                          >
-                            Edit
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => openDeleteDialog(record)}
-                            disabled={actionLoading}
-                            className="rounded-lg border border-red-200 bg-white px-4 py-2 text-xs font-semibold text-red-600 transition hover:border-red-300 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      )}
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </section>
@@ -725,6 +793,184 @@ function FinancePage() {
           </Link>
         </div>
       </div>
+
+      {/* EDIT TRANSACTION MODAL */}
+
+      {editingRecord && isSecretary && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-[2px]"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !actionLoading) {
+              resetForm();
+            }
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="edit-finance-title"
+            className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-3xl border border-slate-200 bg-white p-7 shadow-2xl"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">
+                  Secretary
+                </p>
+
+                <h2 id="edit-finance-title" className="mt-2 text-2xl font-bold text-slate-950">
+                  Edit Transaction
+                </h2>
+
+                <p className="mt-2 text-sm text-slate-500">
+                  Update the details of this finance transaction.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={resetForm}
+                disabled={actionLoading}
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-xl text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
+                aria-label="Close edit transaction"
+              >
+                ×
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="mt-7 grid gap-5 md:grid-cols-2">
+              <div>
+                <label className="text-sm font-semibold text-slate-700">Title</label>
+                <input
+                  name="title"
+                  value={form.title}
+                  onChange={handleFormChange}
+                  placeholder="e.g. Society Donation"
+                  required
+                  className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-slate-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-sm font-semibold text-slate-700">Amount</label>
+                <input
+                  name="amount"
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  value={form.amount}
+                  onChange={handleFormChange}
+                  placeholder="Enter amount"
+                  required
+                  className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-slate-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-sm font-semibold text-slate-700">Type</label>
+                <select
+                  name="type"
+                  value={form.type}
+                  onChange={handleTypeChange}
+                  className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-slate-500"
+                >
+                  <option value="INCOME">Income</option>
+                  <option value="EXPENSE">Expense</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-sm font-semibold text-slate-700">Category</label>
+                <select
+                  name="category"
+                  value={form.category}
+                  onChange={handleFormChange}
+                  required
+                  className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-slate-500"
+                >
+                  <option value="">Select category</option>
+                  {categories.map((category) => (
+                    <option key={category} value={category}>
+                      {category}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-sm font-semibold text-slate-700">Date</label>
+                <input
+                  name="date"
+                  type="date"
+                  value={form.date}
+                  onChange={handleFormChange}
+                  required
+                  className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-slate-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-sm font-semibold text-slate-700">Payment Method</label>
+                <select
+                  name="paymentMethod"
+                  value={form.paymentMethod}
+                  onChange={handleFormChange}
+                  required
+                  className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-slate-500"
+                >
+                  {paymentMethods.map((method) => (
+                    <option key={method} value={method}>
+                      {method.replaceAll("_", " ")}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="text-sm font-semibold text-slate-700">Description</label>
+                <textarea
+                  name="description"
+                  value={form.description}
+                  onChange={handleFormChange}
+                  rows="3"
+                  placeholder="Optional description"
+                  className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-slate-500"
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="text-sm font-semibold text-slate-700">Document URL</label>
+                <input
+                  name="documentUrl"
+                  type="url"
+                  value={form.documentUrl}
+                  onChange={handleFormChange}
+                  placeholder="Optional receipt/document URL"
+                  className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-slate-500"
+                />
+              </div>
+
+              <div className="flex flex-col-reverse gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:justify-end md:col-span-2">
+                <button
+                  type="button"
+                  onClick={resetForm}
+                  disabled={actionLoading}
+                  className="rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={actionLoading}
+                  className="rounded-xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {actionLoading ? "Saving..." : "Save Changes"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* DELETE CONFIRMATION MODAL */}
 
