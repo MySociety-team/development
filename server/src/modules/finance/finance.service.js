@@ -6,6 +6,7 @@ import {
   createFinanceRecord,
   deleteFinanceRecord,
   findFinanceById,
+  findFinanceBySourcePaymentId,
   findFinanceRecordsBySociety,
   getFinanceSummary,
   updateFinanceRecord
@@ -57,6 +58,7 @@ export const createFinance = async ({ societyId, userId, data }) => {
   return createFinanceRecord({
     societyId,
     createdBy: userId,
+    flatId: data.flatId || null,
     title: data.title,
     description: data.description || "",
     amount: Number(data.amount),
@@ -76,7 +78,19 @@ export const updateFinance = async ({ societyId, financeId, data }) => {
   if (!mongoose.isValidObjectId(financeId)) {
     throw new ApiError(400, "FINANCE_ID_INVALID", "Finance ID is invalid");
   }
+  const existingFinance = await findFinanceById(financeId, societyId);
 
+  if (!existingFinance) {
+    throw new ApiError(404, "FINANCE_NOT_FOUND", "Finance record not found");
+  }
+
+  if (existingFinance.sourceType === "MAINTENANCE_PAYMENT") {
+    throw new ApiError(
+      400,
+      "MAINTENANCE_FINANCE_PROTECTED",
+      "Maintenance finance records cannot be edited"
+    );
+  }
   const errors = validateFinanceUpdate(data);
 
   if (Object.keys(errors).length > 0) {
@@ -107,6 +121,20 @@ export const deleteFinance = async ({ societyId, financeId }) => {
     throw new ApiError(400, "FINANCE_ID_INVALID", "Finance ID is invalid");
   }
 
+  const existingFinance = await findFinanceById(financeId, societyId);
+
+  if (!existingFinance) {
+    throw new ApiError(404, "FINANCE_NOT_FOUND", "Finance record not found");
+  }
+
+  if (existingFinance.sourceType === "MAINTENANCE_PAYMENT") {
+    throw new ApiError(
+      400,
+      "MAINTENANCE_FINANCE_PROTECTED",
+      "Maintenance finance records cannot be deleted"
+    );
+  }
+
   const finance = await deleteFinanceRecord(financeId, societyId);
 
   if (!finance) {
@@ -122,4 +150,70 @@ export const getSummary = async ({ societyId }) => {
   }
 
   return getFinanceSummary(societyId);
+};
+
+// =====================================================
+// CREATE FINANCE INCOME FROM MAINTENANCE PAYMENT
+// =====================================================
+
+export const createMaintenanceIncome = async ({ societyId, payment, bill, userId }) => {
+  if (!payment) {
+    throw new ApiError(400, "MAINTENANCE_PAYMENT_REQUIRED", "Maintenance payment is required");
+  }
+
+  if (!bill) {
+    throw new ApiError(400, "MAINTENANCE_BILL_REQUIRED", "Maintenance bill is required");
+  }
+
+  if (payment.status !== "SUCCESS") {
+    throw new ApiError(
+      400,
+      "MAINTENANCE_PAYMENT_NOT_SUCCESS",
+      "Only successful maintenance payments can create Finance income"
+    );
+  }
+
+  // Check whether this MaintenancePayment has
+  // already created a Finance record.
+  const existingFinance = await findFinanceBySourcePaymentId(payment._id);
+
+  if (existingFinance) {
+    return existingFinance;
+  }
+
+  const month = bill.month || "Maintenance";
+
+  try {
+    return await createFinanceRecord({
+      societyId,
+      flatId: payment.flatId || null,
+      title: `Maintenance Collection - ${month}`,
+      description:
+        payment.paymentMethod === "RAZORPAY"
+          ? `Maintenance payment received via Razorpay for ${month}`
+          : `Maintenance payment received via ${payment.paymentMethod} for ${month}`,
+      amount: Number(payment.amount),
+      type: "INCOME",
+      category: "Maintenance",
+      date: payment.paymentDate || new Date(),
+      paymentMethod: payment.paymentMethod,
+      documentUrl: null,
+      createdBy: userId,
+      sourceType: "MAINTENANCE_PAYMENT",
+      sourcePaymentId: payment._id
+    });
+  } catch (error) {
+    // If another request created the Finance record
+    // at the same time, return that record instead
+    // of creating a duplicate.
+    if (error?.code === 11000) {
+      const concurrentFinance = await findFinanceBySourcePaymentId(payment._id);
+
+      if (concurrentFinance) {
+        return concurrentFinance;
+      }
+    }
+
+    throw error;
+  }
 };

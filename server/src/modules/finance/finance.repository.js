@@ -1,9 +1,8 @@
 import Finance from "../../models/Finance.js";
+import Flat from "../../models/Flat.js";
 
 export const findFinanceRecordsBySociety = async (societyId, filters = {}) => {
-  const query = {
-    societyId
-  };
+  const query = { societyId };
 
   if (filters.type) {
     query.type = filters.type;
@@ -14,14 +13,52 @@ export const findFinanceRecordsBySociety = async (societyId, filters = {}) => {
   }
 
   if (filters.search) {
+    const matchingFlats = await Flat.find({
+      societyId,
+      flatNumber: {
+        $regex: filters.search,
+        $options: "i"
+      }
+    })
+      .select("_id")
+      .lean();
+
+    const flatIds = matchingFlats.map((flat) => flat._id);
+
     query.$or = [
-      { title: { $regex: filters.search, $options: "i" } },
-      { description: { $regex: filters.search, $options: "i" } },
-      { category: { $regex: filters.search, $options: "i" } }
+      {
+        title: {
+          $regex: filters.search,
+          $options: "i"
+        }
+      },
+      {
+        description: {
+          $regex: filters.search,
+          $options: "i"
+        }
+      },
+      {
+        category: {
+          $regex: filters.search,
+          $options: "i"
+        }
+      },
+      {
+        flatId: {
+          $in: flatIds
+        }
+      }
     ];
   }
 
-  return Finance.find(query).populate("createdBy", "name email").sort({ date: -1, createdAt: -1 });
+  return Finance.find(query)
+    .populate("createdBy", "name email")
+    .populate("flatId", "flatNumber")
+    .sort({
+      date: -1,
+      createdAt: -1
+    });
 };
 
 export const findFinanceById = async (financeId, societyId) => {
@@ -90,4 +127,10 @@ export const getFinanceSummary = async (societyId) => {
     totalExpenses,
     currentBalance: totalIncome - totalExpenses
   };
+};
+export const findFinanceBySourcePaymentId = async (sourcePaymentId) => {
+  return Finance.findOne({
+    sourceType: "MAINTENANCE_PAYMENT",
+    sourcePaymentId
+  });
 };
