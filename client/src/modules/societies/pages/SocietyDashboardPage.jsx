@@ -13,6 +13,27 @@ function SocietyDashboardPage() {
   const [errorMessage, setErrorMessage] = useState("");
   const [copied, setCopied] = useState(false);
 
+  const handleCopyCode = async (code) => {
+    if (!code) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      const textArea = document.createElement("textarea");
+      textArea.value = code;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textArea);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
   useEffect(() => {
     let cancelled = false;
 
@@ -40,24 +61,6 @@ function SocietyDashboardPage() {
       cancelled = true;
     };
   }, [societyId]);
-
-  const handleCopyCode = async () => {
-    if (!data?.society?.joiningCode) {
-      return;
-    }
-
-    try {
-      await navigator.clipboard.writeText(data.society.joiningCode);
-
-      setCopied(true);
-
-      setTimeout(() => {
-        setCopied(false);
-      }, 2000);
-    } catch (err) {
-      console.error("Failed to copy joining code:", err);
-    }
-  };
 
   if (loading) {
     return (
@@ -110,7 +113,12 @@ function SocietyDashboardPage() {
   const isSecretary = membership?.role === "SECRETARY";
 
   return (
-    <AppShell title={society.name} description={society.address} backTo="/societies">
+    <AppShell
+      title={society.name}
+      description={society.address}
+      backTo="/societies"
+      societyId={society.id}
+    >
       <div className="mx-auto max-w-6xl space-y-7">
         {/* =====================================================
             SOCIETY HEADER
@@ -217,9 +225,10 @@ function SocietyDashboardPage() {
 
                   <button
                     type="button"
-                    onClick={handleCopyCode}
-                    className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:text-slate-900 hover:shadow"
-                    title="Copy Joining Code"
+                    onClick={() => handleCopyCode(society.joiningCode)}
+                    className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-slate-300 bg-white text-slate-600 shadow-sm transition hover:border-slate-400 hover:bg-slate-100 hover:text-slate-950 focus:outline-none focus:ring-2 focus:ring-slate-400/20"
+                    title={copied ? "Copied to clipboard!" : "Copy joining code"}
+                    aria-label="Copy joining code"
                   >
                     {copied ? (
                       <svg
@@ -230,7 +239,11 @@ function SocietyDashboardPage() {
                         stroke="currentColor"
                         strokeWidth={2.5}
                       >
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        <path
+                          fillRule="evenodd"
+                          d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                          clipRule="evenodd"
+                        />
                       </svg>
                     ) : (
                       <svg
@@ -251,13 +264,15 @@ function SocietyDashboardPage() {
                   </button>
                 </div>
 
-                <p className="mt-4 text-xs text-slate-500">
-                  {copied ? (
-                    <span className="font-semibold text-emerald-600">Copied to clipboard!</span>
-                  ) : (
-                    "Residents can use this code from the Join Society page."
-                  )}
-                </p>
+                {copied ? (
+                  <p className="mt-2 text-xs font-semibold text-emerald-600">
+                    Copied joining code to clipboard!
+                  </p>
+                ) : (
+                  <p className="mt-3 text-xs text-slate-500">
+                    Residents can use this code from the Join Society page.
+                  </p>
+                )}
               </div>
             </div>
           </section>
@@ -279,13 +294,11 @@ function SocietyDashboardPage() {
             <dl className="mt-6 divide-y divide-slate-100 border-y border-slate-100">
               <div className="flex items-center justify-between gap-4 py-4">
                 <dt className="text-sm text-slate-500">Floor</dt>
-
                 <dd className="text-sm font-semibold text-slate-900">{membership.flat?.floor}</dd>
               </div>
 
               <div className="flex items-center justify-between gap-4 py-4">
                 <dt className="text-sm text-slate-500">Type</dt>
-
                 <dd className="text-sm font-semibold text-slate-900">
                   {membership.flat?.flatType}
                 </dd>
@@ -535,7 +548,7 @@ function SocietyDashboardPage() {
             </div>
 
             <p className="mt-3 text-sm leading-6 text-slate-500">
-              Lodge, view, and manage complaints or maintenance issues in your society.
+              Raise, track, and resolve maintenance issues and complaints.
             </p>
 
             <div className="mt-auto pt-6 text-sm font-semibold text-slate-900">
