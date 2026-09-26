@@ -62,24 +62,6 @@ function SocietyDashboardPage() {
     };
   }, [societyId]);
 
-  const handleCopyCode = async () => {
-    if (!data?.society?.joiningCode) {
-      return;
-    }
-
-    try {
-      await navigator.clipboard.writeText(data.society.joiningCode);
-
-      setCopied(true);
-
-      setTimeout(() => {
-        setCopied(false);
-      }, 2000);
-    } catch (err) {
-      console.error("Failed to copy joining code:", err);
-    }
-  };
-
   if (loading) {
     return (
       <AppShell title="Society dashboard" backTo="/societies">
