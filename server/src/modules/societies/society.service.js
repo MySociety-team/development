@@ -8,6 +8,7 @@ import User from "../../models/User.js";
 import ApiError from "../../utils/apiError.js";
 
 import { generateUniqueJoiningCode, normalizeFacility } from "./society.utils.js";
+
 import {
   validateCreateSocietyPayload,
   validateJoiningCodePayload,
@@ -252,8 +253,7 @@ export const getMySocieties = async ({ userId }) => {
     })
     .sort({
       createdAt: -1
-    })
-    .lean();
+    });
 
   return memberships
     .filter((membership) => membership.societyId?.isActive)
@@ -314,152 +314,144 @@ const flatDetailsMatch = (existingFlat, details) => {
   );
 };
 
+/*
+ * Join society.
+ *
+ * IMPORTANT:
+ * This function intentionally does not use a MongoDB transaction.
+ *
+ * The local MySociety MongoDB instance is currently running
+ * as a standalone server rather than as a replica set.
+ *
+ * MongoDB transactions require a replica set or mongos.
+ *
+ * createSociety() above still uses its existing transaction.
+ */
 export const joinSociety = async ({ user, societyId, payload }) => {
   const validated = validateJoinSocietyPayload({
     societyId,
     payload
   });
 
-  const session = await mongoose.startSession();
-
   let result;
 
   try {
-    await session.withTransaction(async () => {
-      const society = await Society.findOne({
-        _id: societyId,
-        isActive: true
-      }).session(session);
-
-      if (!society) {
-        throw new ApiError(404, "SOCIETY_NOT_FOUND", "The requested society does not exist");
-      }
-
-      const existingMembership = await SocietyMember.findOne({
-        societyId,
-        userId: user.id
-      }).session(session);
-
-      if (existingMembership?.status === "ACTIVE") {
-        throw new ApiError(
-          409,
-          "SOCIETY_MEMBERSHIP_ALREADY_EXISTS",
-          "You are already a member of this society"
-        );
-      }
-
-      let flat = await Flat.findOne({
-        societyId,
-        flatNumber: validated.flatNumber
-      }).session(session);
-
-      if (flat && !flatDetailsMatch(flat, validated)) {
-        throw new ApiError(
-          409,
-          "FLAT_DETAILS_MISMATCH",
-          "A flat with this number already exists, but its floor, wing or flat type does not match"
-        );
-      }
-
-      if (!flat) {
-        const flatCount = await Flat.countDocuments({
-          societyId
-        }).session(session);
-
-        if (flatCount >= society.numberOfFlats) {
-          throw new ApiError(
-            409,
-            "SOCIETY_FLAT_LIMIT_REACHED",
-            "The configured number of flats for this society has already been reached"
-          );
-        }
-
-        [flat] = await Flat.create(
-          [
-            {
-              societyId,
-              flatNumber: validated.flatNumber,
-              floor: validated.floor,
-              wing: validated.wing,
-              addressNote: validated.addressNote,
-              flatType: validated.flatType,
-              invitedEmails: validated.invitedEmails,
-              isOccupied: true
-            }
-          ],
-          {
-            session
-          }
-        );
-      } else {
-        flat.isOccupied = true;
-
-        const invitedEmails = flat.invitedEmails ?? [];
-
-        for (const email of validated.invitedEmails) {
-          if (!invitedEmails.includes(email)) {
-            invitedEmails.push(email);
-          }
-        }
-
-        flat.invitedEmails = invitedEmails;
-
-        await flat.save({
-          session
-        });
-      }
-
-      let membership;
-
-      if (existingMembership) {
-        existingMembership.flatId = flat._id;
-        existingMembership.role = "RESIDENT";
-        existingMembership.memberType = validated.memberType;
-        existingMembership.mobileNumber = validated.mobileNumber;
-        existingMembership.status = "ACTIVE";
-
-        membership = await existingMembership.save({
-          session
-        });
-      } else {
-        [membership] = await SocietyMember.create(
-          [
-            {
-              societyId,
-              userId: user.id,
-              flatId: flat._id,
-              role: "RESIDENT",
-              memberType: validated.memberType,
-              mobileNumber: validated.mobileNumber,
-              status: "ACTIVE"
-            }
-          ],
-          {
-            session
-          }
-        );
-      }
-
-      await User.updateOne(
-        {
-          _id: user.id
-        },
-        {
-          $set: {
-            mobileNumber: validated.mobileNumber
-          }
-        },
-        {
-          session
-        }
-      );
-
-      result = {
-        society,
-        flat,
-        membership
-      };
+    const society = await Society.findOne({
+      _id: societyId,
+      isActive: true
     });
+
+    if (!society) {
+      throw new ApiError(404, "SOCIETY_NOT_FOUND", "The requested society does not exist");
+    }
+
+    const existingMembership = await SocietyMember.findOne({
+      societyId,
+      userId: user.id
+    });
+
+    if (existingMembership?.status === "ACTIVE") {
+      throw new ApiError(
+        409,
+        "SOCIETY_MEMBERSHIP_ALREADY_EXISTS",
+        "You are already a member of this society"
+      );
+    }
+
+    let flat = await Flat.findOne({
+      societyId,
+      flatNumber: validated.flatNumber
+    });
+
+    if (flat && !flatDetailsMatch(flat, validated)) {
+      throw new ApiError(
+        409,
+        "FLAT_DETAILS_MISMATCH",
+        "A flat with this number already exists, but its floor, wing or flat type does not match"
+      );
+    }
+
+    if (!flat) {
+      const flatCount = await Flat.countDocuments({
+        societyId
+      });
+
+      if (flatCount >= society.numberOfFlats) {
+        throw new ApiError(
+          409,
+          "SOCIETY_FLAT_LIMIT_REACHED",
+          "The configured number of flats for this society has already been reached"
+        );
+      }
+
+      flat = await Flat.create({
+        societyId,
+        flatNumber: validated.flatNumber,
+        floor: validated.floor,
+        wing: validated.wing,
+        addressNote: validated.addressNote,
+        flatType: validated.flatType,
+        invitedEmails: validated.invitedEmails,
+        isOccupied: true
+      });
+    } else {
+      flat.isOccupied = true;
+
+      const invitedEmails = flat.invitedEmails ?? [];
+
+      for (const email of validated.invitedEmails) {
+        if (!invitedEmails.includes(email)) {
+          invitedEmails.push(email);
+        }
+      }
+
+      flat.invitedEmails = invitedEmails;
+
+      await flat.save();
+    }
+
+    let membership;
+
+    if (existingMembership) {
+      existingMembership.flatId = flat._id;
+
+      existingMembership.role = "RESIDENT";
+
+      existingMembership.memberType = validated.memberType;
+
+      existingMembership.mobileNumber = validated.mobileNumber;
+
+      existingMembership.status = "ACTIVE";
+
+      membership = await existingMembership.save();
+    } else {
+      membership = await SocietyMember.create({
+        societyId,
+        userId: user.id,
+        flatId: flat._id,
+        role: "RESIDENT",
+        memberType: validated.memberType,
+        mobileNumber: validated.mobileNumber,
+        status: "ACTIVE"
+      });
+    }
+
+    await User.updateOne(
+      {
+        _id: user.id
+      },
+      {
+        $set: {
+          mobileNumber: validated.mobileNumber
+        }
+      }
+    );
+
+    result = {
+      society,
+      flat,
+      membership
+    };
   } catch (error) {
     const conflictError = mapDuplicateKeyError(error);
 
@@ -468,8 +460,6 @@ export const joinSociety = async ({ user, societyId, payload }) => {
     }
 
     throw error;
-  } finally {
-    await session.endSession();
   }
 
   return {
@@ -495,6 +485,7 @@ export const getSocietyDetails = async ({ userId, societyId }) => {
     })
       .select("name address joiningCode secretary numberOfFlats facilities createdAt")
       .lean(),
+
     SocietyMember.findOne({
       societyId,
       userId,
@@ -526,6 +517,7 @@ export const getSocietyDetails = async ({ userId, societyId }) => {
       facilities: society.facilities,
       createdAt: society.createdAt
     },
+
     membership: {
       id: membership._id.toString(),
       role: membership.role,
@@ -560,6 +552,7 @@ export const getSocietyMembers = async ({ societyId }) => {
     role: membership.role,
     memberType: membership.memberType,
     mobileNumber: membership.mobileNumber,
+
     user: membership.userId
       ? {
           id: membership.userId._id.toString(),
@@ -568,6 +561,7 @@ export const getSocietyMembers = async ({ societyId }) => {
           avatarUrl: membership.userId.avatarUrl
         }
       : null,
+
     flat: serializeFlat(membership.flatId)
   }));
 };
