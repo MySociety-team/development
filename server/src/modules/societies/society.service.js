@@ -14,7 +14,10 @@ import {
   validateJoiningCodePayload,
   validateJoinSocietyPayload
 } from "./society.validation.js";
-import { createBulkNotifications } from "../notifications/notification.service.js";
+import {
+  createBulkNotifications,
+  createNotification
+} from "../notifications/notification.service.js";
 
 export const checkSocietyCreationSubscription = async ({ userId, session = null }) => {
   const enforcementEnabled = process.env.SOCIETY_SUBSCRIPTION_ENFORCEMENT !== "false";
@@ -310,24 +313,10 @@ export const verifyJoiningCode = async ({ userId, payload }) => {
     };
   }
 
-  let request = await SocietyJoinRequest.findOne({
+  const existingRequest = await SocietyJoinRequest.findOne({
     societyId: society._id,
     userId
-  });
-
-  if (!request) {
-    request = await SocietyJoinRequest.create({
-      societyId: society._id,
-      userId,
-      status: "PENDING"
-    });
-  } else if (request.status === "REJECTED") {
-    request.status = "PENDING";
-    request.reviewedBy = null;
-    request.reviewedAt = null;
-    request.completedAt = null;
-    await request.save();
-  }
+  }).lean();
 
   return {
     id: society._id.toString(),
@@ -337,8 +326,19 @@ export const verifyJoiningCode = async ({ userId, payload }) => {
     numberOfFlats: society.numberOfFlats,
     facilities: society.facilities,
     alreadyMember: false,
-    requestStatus: request.status,
-    requestId: request._id.toString()
+    requestStatus: existingRequest?.status || null,
+    requestId: existingRequest?._id?.toString() || null,
+    requestDetails: existingRequest
+      ? {
+          flatNumber: existingRequest.flatNumber || "",
+          wing: existingRequest.wing || "",
+          floor: existingRequest.floor,
+          flatType: existingRequest.flatType || "2BHK",
+          memberType: existingRequest.memberType || "OWNER",
+          addressNote: existingRequest.addressNote || "",
+          mobileNumber: existingRequest.mobileNumber || ""
+        }
+      : null
   };
 };
 
@@ -348,15 +348,119 @@ const serializeJoinRequest = (request) => ({
   status: request.status,
   createdAt: request.createdAt,
   reviewedAt: request.reviewedAt,
+  completedAt: request.completedAt,
+  flatNumber: request.flatNumber || "",
+  floor: request.floor ?? null,
+  wing: request.wing || "",
+  addressNote: request.addressNote || "",
+  flatType: request.flatType || "",
+  memberType: request.memberType || "OWNER",
+  mobileNumber: request.mobileNumber || "",
+  invitedEmails: request.invitedEmails || [],
   user: request.userId
     ? {
-        id: request.userId._id.toString(),
-        name: request.userId.name,
-        email: request.userId.email,
-        mobileNumber: request.userId.mobileNumber
+        id: request.userId._id ? request.userId._id.toString() : request.userId.toString(),
+        name: request.userId.name || "Resident",
+        email: request.userId.email || "",
+        mobileNumber: request.userId.mobileNumber || request.mobileNumber || ""
       }
     : null
 });
+
+export const submitSocietyJoinRequest = async ({ user, societyId, payload }) => {
+  const validated = validateJoinSocietyPayload({
+    societyId,
+    payload
+  });
+
+  const society = await Society.findOne({
+    _id: societyId,
+    isActive: true
+  }).lean();
+
+  if (!society) {
+    throw new ApiError(404, "SOCIETY_NOT_FOUND", "The requested society does not exist");
+  }
+
+  const existingMembership = await SocietyMember.findOne({
+    societyId,
+    userId: user.id,
+    status: "ACTIVE"
+  }).lean();
+
+  if (existingMembership) {
+    throw new ApiError(
+      409,
+      "SOCIETY_MEMBERSHIP_ALREADY_EXISTS",
+      "You are already a member of this society"
+    );
+  }
+
+  let request = await SocietyJoinRequest.findOne({
+    societyId,
+    userId: user.id
+  });
+
+  if (!request) {
+    request = new SocietyJoinRequest({
+      societyId,
+      userId: user.id,
+      status: "PENDING"
+    });
+  } else {
+    request.status = "PENDING";
+    request.reviewedBy = null;
+    request.reviewedAt = null;
+    request.completedAt = null;
+  }
+
+  request.flatNumber = validated.flatNumber;
+  request.floor = validated.floor;
+  request.wing = validated.wing;
+  request.addressNote = validated.addressNote;
+  request.flatType = validated.flatType;
+  request.memberType = validated.memberType;
+  request.mobileNumber = validated.mobileNumber;
+  request.invitedEmails = validated.invitedEmails;
+
+  await request.save();
+
+  // Notify the SECRETARY that they got a new request from the resident name!
+  if (society.secretary) {
+    try {
+      const requester = await User.findById(user.id).select("name email");
+      const residentName = requester?.name || user.name || "A resident";
+      const flatLabel = validated.wing
+        ? `Flat ${validated.wing}-${validated.flatNumber}`
+        : `Flat ${validated.flatNumber}`;
+
+      await createNotification({
+        recipientId: society.secretary,
+        societyId,
+        type: "JOIN_REQUEST_SUBMITTED",
+        title: "New Join Request",
+        message: `You have received a new join request from ${residentName} for ${flatLabel} (${validated.memberType}).`,
+        link: `/societies/${societyId}/join-requests`,
+        metadata: {
+          requestId: request._id,
+          userId: user.id,
+          residentName,
+          flatNumber: validated.flatNumber,
+          wing: validated.wing,
+          memberType: validated.memberType
+        }
+      });
+    } catch (err) {
+      console.error("Failed to notify secretary of join request:", err);
+    }
+  }
+
+  return {
+    request: serializeJoinRequest(request),
+    message:
+      "Join request submitted successfully. You will be automatically added once the secretary approves."
+  };
+};
 
 export const getSocietyJoinRequests = async ({ societyId }) => {
   if (!mongoose.isValidObjectId(societyId)) {
@@ -444,21 +548,240 @@ const updateJoinRequestStatus = async ({ societyId, requestId, secretaryId, stat
 };
 
 export const approveSocietyJoinRequest = async ({ societyId, requestId, secretaryId }) => {
-  return updateJoinRequestStatus({
-    societyId,
-    requestId,
-    secretaryId,
-    status: "APPROVED"
+  if (!mongoose.isValidObjectId(societyId)) {
+    throw new ApiError(400, "SOCIETY_ID_INVALID", "Society ID is invalid");
+  }
+
+  if (!mongoose.isValidObjectId(requestId)) {
+    throw new ApiError(400, "JOIN_REQUEST_ID_INVALID", "Join request ID is invalid");
+  }
+
+  const society = await Society.findOne({
+    _id: societyId,
+    isActive: true
   });
+
+  if (!society) {
+    throw new ApiError(404, "SOCIETY_NOT_FOUND", "The requested society does not exist");
+  }
+
+  if (society.secretary.toString() !== secretaryId.toString()) {
+    throw new ApiError(
+      403,
+      "SOCIETY_ROLE_FORBIDDEN",
+      "Only the society secretary can manage join requests"
+    );
+  }
+
+  const request = await SocietyJoinRequest.findOne({
+    _id: requestId,
+    societyId,
+    status: "PENDING"
+  });
+
+  if (!request) {
+    throw new ApiError(
+      404,
+      "SOCIETY_JOIN_REQUEST_NOT_FOUND",
+      "The pending society join request could not be found"
+    );
+  }
+
+  const session = await mongoose.startSession();
+  let createdMembership;
+  let flatRecord;
+
+  try {
+    await session.withTransaction(async () => {
+      // If flat details exist on the request, directly add the resident to the society!
+      if (request.flatNumber) {
+        flatRecord = await Flat.findOne({
+          societyId,
+          flatNumber: request.flatNumber
+        }).session(session);
+
+        if (!flatRecord) {
+          const flatCount = await Flat.countDocuments({ societyId }).session(session);
+          if (flatCount >= society.numberOfFlats) {
+            throw new ApiError(
+              409,
+              "SOCIETY_FLAT_LIMIT_REACHED",
+              "The configured number of flats for this society has already been reached"
+            );
+          }
+
+          [flatRecord] = await Flat.create(
+            [
+              {
+                societyId,
+                flatNumber: request.flatNumber,
+                floor: request.floor ?? 1,
+                wing: request.wing || "",
+                addressNote: request.addressNote || "",
+                flatType: request.flatType || "2BHK",
+                invitedEmails: request.invitedEmails || [],
+                isOccupied: true
+              }
+            ],
+            { session }
+          );
+        } else {
+          flatRecord.isOccupied = true;
+          if (request.invitedEmails?.length) {
+            const invited = flatRecord.invitedEmails || [];
+            for (const email of request.invitedEmails) {
+              if (!invited.includes(email)) {
+                invited.push(email);
+              }
+            }
+            flatRecord.invitedEmails = invited;
+          }
+          await flatRecord.save({ session });
+        }
+
+        const existingMember = await SocietyMember.findOne({
+          societyId,
+          userId: request.userId
+        }).session(session);
+
+        if (existingMember) {
+          existingMember.flatId = flatRecord._id;
+          existingMember.role = "RESIDENT";
+          existingMember.memberType = request.memberType || "OWNER";
+          existingMember.mobileNumber = request.mobileNumber || "";
+          existingMember.status = "ACTIVE";
+          createdMembership = await existingMember.save({ session });
+        } else {
+          [createdMembership] = await SocietyMember.create(
+            [
+              {
+                societyId,
+                userId: request.userId,
+                flatId: flatRecord._id,
+                role: "RESIDENT",
+                memberType: request.memberType || "OWNER",
+                mobileNumber: request.mobileNumber || "",
+                status: "ACTIVE"
+              }
+            ],
+            { session }
+          );
+        }
+
+        if (request.mobileNumber) {
+          await User.updateOne(
+            { _id: request.userId },
+            { $set: { mobileNumber: request.mobileNumber } },
+            { session }
+          );
+        }
+      }
+
+      request.status = request.flatNumber ? "COMPLETED" : "APPROVED";
+      request.reviewedBy = secretaryId;
+      request.reviewedAt = new Date();
+      if (request.flatNumber) {
+        request.completedAt = new Date();
+      }
+      await request.save({ session });
+    });
+  } finally {
+    await session.endSession();
+  }
+
+  await request.populate({
+    path: "userId",
+    select: "name email mobileNumber"
+  });
+
+  // Notify resident that their request has been approved and they are directly added!
+  try {
+    const flatLabel = request.wing
+      ? `Flat ${request.wing}-${request.flatNumber}`
+      : request.flatNumber
+        ? `Flat ${request.flatNumber}`
+        : "";
+    const residentMessage = flatLabel
+      ? `Your request to join ${society.name} has been approved! You have been directly added to ${flatLabel}. Welcome home!`
+      : `Your request to join ${society.name} was approved!`;
+
+    await createNotification({
+      recipientId: request.userId._id,
+      societyId,
+      type: "JOIN_REQUEST_APPROVED",
+      title: "Join Request Approved!",
+      message: residentMessage,
+      link: `/societies/${societyId}/dashboard`,
+      metadata: {
+        requestId: request._id,
+        societyId
+      }
+    });
+
+    // Notify other society members of new resident
+    if (createdMembership && flatRecord) {
+      const activeMembers = await SocietyMember.find({
+        societyId,
+        status: "ACTIVE"
+      }).select("userId");
+
+      if (activeMembers.length > 0) {
+        const notifications = activeMembers
+          .filter((m) => m.userId.toString() !== request.userId._id.toString())
+          .map((m) => ({
+            recipientId: m.userId,
+            societyId,
+            type: "MEMBER_JOINED",
+            title: "New Resident Joined",
+            message: `${request.userId.name || "A new resident"}${flatLabel ? ` (${flatLabel})` : ""} joined as ${request.memberType || "Resident"}.`,
+            link: `/societies/${societyId}/members`,
+            metadata: {
+              memberId: createdMembership._id,
+              userId: request.userId._id
+            }
+          }));
+
+        if (notifications.length > 0) {
+          await createBulkNotifications(notifications);
+        }
+      }
+    }
+  } catch (err) {
+    console.error("Failed to notify user/members of approved join request:", err);
+  }
+
+  return serializeJoinRequest(request);
 };
 
 export const rejectSocietyJoinRequest = async ({ societyId, requestId, secretaryId }) => {
-  return updateJoinRequestStatus({
+  const result = await updateJoinRequestStatus({
     societyId,
     requestId,
     secretaryId,
     status: "REJECTED"
   });
+
+  try {
+    const society = await Society.findById(societyId).select("name");
+    if (result.user?.id) {
+      await createNotification({
+        recipientId: result.user.id,
+        societyId,
+        type: "JOIN_REQUEST_REJECTED",
+        title: "Join Request Declined",
+        message: `Your request to join ${society?.name || "the society"} was declined.`,
+        link: "/societies/join",
+        metadata: {
+          requestId,
+          societyId
+        }
+      });
+    }
+  } catch (err) {
+    console.error("Failed to notify user of rejected join request:", err);
+  }
+
+  return result;
 };
 
 const flatDetailsMatch = (existingFlat, details) => {

@@ -1,7 +1,9 @@
 import mongoose from "mongoose";
 
 import Contact from "../../models/Contact.js";
+import SocietyMember from "../../models/SocietyMember.js";
 import ApiError from "../../utils/apiError.js";
+import { createBulkNotifications } from "../notifications/notification.service.js";
 
 export const getContacts = async ({ societyId, search = "" }) => {
   if (!mongoose.isValidObjectId(societyId)) {
@@ -33,6 +35,31 @@ export const createContact = async ({ societyId, contactData }) => {
     societyId,
     ...contactData
   });
+
+  try {
+    const activeMembers = await SocietyMember.find({
+      societyId,
+      status: "ACTIVE"
+    }).select("userId");
+
+    if (activeMembers.length > 0) {
+      const notifications = activeMembers.map((member) => ({
+        recipientId: member.userId,
+        societyId,
+        type: "CONTACT_ADDED",
+        title: "New Contact Added",
+        message: `${contact.name} (${contact.profession || "Service"}) was added to the society directory.`,
+        link: `/societies/${societyId}/contacts`,
+        metadata: {
+          contactId: contact._id
+        }
+      }));
+
+      await createBulkNotifications(notifications);
+    }
+  } catch (err) {
+    console.error("Failed to notify members of new contact:", err);
+  }
 
   return contact;
 };

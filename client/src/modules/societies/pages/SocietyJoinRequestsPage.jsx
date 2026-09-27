@@ -146,25 +146,59 @@ function SocietyJoinRequestsPage() {
                     key={request.id}
                     className="flex flex-col gap-5 px-6 py-6 sm:px-7 lg:flex-row lg:items-center lg:justify-between"
                   >
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-sm font-bold text-slate-700">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-3">
+                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-sm font-bold text-white shadow-xs">
                           {user?.name?.charAt(0)?.toUpperCase() ?? "?"}
                         </div>
 
                         <div>
-                          <h3 className="font-bold text-slate-950">
-                            {user?.name ?? "Unknown user"}
-                          </h3>
-                          <p className="mt-0.5 text-sm text-slate-500">
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-bold text-slate-950 text-base">
+                              {user?.name ?? "Unknown user"}
+                            </h3>
+                            {request.memberType && (
+                              <span className="rounded-md bg-purple-50 border border-purple-200 px-2 py-0.5 text-[11px] font-semibold text-purple-700 uppercase tracking-wide">
+                                {request.memberType}
+                              </span>
+                            )}
+                          </div>
+                          <p className="mt-0.5 text-xs text-slate-500">
                             {user?.email ?? "No email available"}
                           </p>
                         </div>
                       </div>
 
-                      <div className="mt-4 flex flex-wrap gap-x-5 gap-y-1 pl-0 text-xs text-slate-500 sm:pl-12">
-                        {user?.mobileNumber && <span>Mobile: {user.mobileNumber}</span>}
-                        <span>Requested {new Date(request.createdAt).toLocaleString()}</span>
+                      {/* Proposed Flat Details */}
+                      {request.flatNumber && (
+                        <div className="mt-3 flex flex-wrap items-center gap-2 pl-0 sm:pl-14">
+                          <span className="inline-flex items-center gap-1 rounded-lg bg-blue-50 border border-blue-200 px-2.5 py-1 text-xs font-bold text-blue-900">
+                            🏢 Flat {request.wing ? `${request.wing}-` : ""}
+                            {request.flatNumber}
+                          </span>
+                          {request.floor !== null && request.floor !== undefined && (
+                            <span className="rounded-lg bg-slate-100 border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700">
+                              Floor {request.floor}
+                            </span>
+                          )}
+                          {request.flatType && (
+                            <span className="rounded-lg bg-slate-100 border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700">
+                              {request.flatType}
+                            </span>
+                          )}
+                          {request.addressNote && (
+                            <span className="rounded-lg bg-slate-50 border border-slate-200 px-2.5 py-1 text-xs text-slate-600 italic">
+                              &ldquo;{request.addressNote}&rdquo;
+                            </span>
+                          )}
+                        </div>
+                      )}
+
+                      <div className="mt-2.5 flex flex-wrap gap-x-5 gap-y-1 pl-0 text-xs text-slate-500 sm:pl-14">
+                        {(request.mobileNumber || user?.mobileNumber) && (
+                          <span>📞 {request.mobileNumber || user?.mobileNumber}</span>
+                        )}
+                        <span>🕒 Requested {new Date(request.createdAt).toLocaleString()}</span>
                       </div>
                     </div>
 

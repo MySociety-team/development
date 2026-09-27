@@ -7,6 +7,7 @@ import {
   getSocietyMembers,
   getSocietyJoinRequests,
   joinSociety,
+  submitSocietyJoinRequest,
   approveSocietyJoinRequest,
   rejectSocietyJoinRequest,
   verifyJoiningCode
@@ -40,6 +41,21 @@ export const verifyJoiningCodeController = asyncHandler(async (req, res) => {
     data: {
       society
     }
+  });
+});
+
+export const submitSocietyJoinRequestController = asyncHandler(async (req, res) => {
+  const result = await submitSocietyJoinRequest({
+    user: req.user,
+    societyId: req.params.societyId,
+    payload: req.body
+  });
+
+  return res.status(200).json({
+    success: true,
+    code: "SOCIETY_JOIN_REQUEST_SUBMITTED",
+    message: result.message,
+    data: result
   });
 });
 

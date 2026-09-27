@@ -8,6 +8,8 @@ import {
 
 import ApiError from "../../utils/apiError.js";
 
+import SocietyMember from "../../models/SocietyMember.js";
+import { createBulkNotifications } from "../notifications/notification.service.js";
 import {
   validateAnnouncementId,
   validateCreateAnnouncement,
@@ -38,11 +40,44 @@ export const createAnnouncement = async ({ societyId, userId, announcementData }
   validateSocietyId(societyId);
   validateCreateAnnouncement(announcementData);
 
-  return createAnnouncementRepository({
+  const announcement = await createAnnouncementRepository({
     societyId,
     createdBy: userId,
     ...announcementData
   });
+
+  try {
+    const activeMembers = await SocietyMember.find({
+      societyId,
+      status: "ACTIVE"
+    }).select("userId");
+
+    if (activeMembers.length > 0) {
+      const snippet = announcement.content
+        ? announcement.content.length > 120
+          ? `${announcement.content.slice(0, 117)}...`
+          : announcement.content
+        : "A new announcement has been posted for the society.";
+
+      const notifications = activeMembers.map((member) => ({
+        recipientId: member.userId,
+        societyId,
+        type: "ANNOUNCEMENT_CREATED",
+        title: `Announcement: ${announcement.title}`,
+        message: snippet,
+        link: `/societies/${societyId}/announcements/${announcement._id}`,
+        metadata: {
+          announcementId: announcement._id
+        }
+      }));
+
+      await createBulkNotifications(notifications);
+    }
+  } catch (err) {
+    console.error("Failed to notify members of announcement:", err);
+  }
+
+  return announcement;
 };
 
 export const updateAnnouncement = async ({ societyId, announcementId, announcementData }) => {

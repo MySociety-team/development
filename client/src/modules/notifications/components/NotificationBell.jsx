@@ -59,6 +59,62 @@ const TYPE_CONFIG = {
     text: "text-purple-700",
     badge: "Resident"
   },
+  ANNOUNCEMENT_CREATED: {
+    icon: "📢",
+    bg: "bg-indigo-50",
+    border: "border-indigo-200",
+    text: "text-indigo-700",
+    badge: "Announcement"
+  },
+  MAINTENANCE_BILL_GENERATED: {
+    icon: "💳",
+    bg: "bg-violet-50",
+    border: "border-violet-200",
+    text: "text-violet-700",
+    badge: "Maintenance"
+  },
+  MAINTENANCE_PAYMENT_SUCCESS: {
+    icon: "💰",
+    bg: "bg-emerald-50",
+    border: "border-emerald-200",
+    text: "text-emerald-700",
+    badge: "Payment"
+  },
+  MAINTENANCE_OVERDUE: {
+    icon: "⚠️",
+    bg: "bg-rose-50",
+    border: "border-rose-200",
+    text: "text-rose-700",
+    badge: "Overdue"
+  },
+  JOIN_REQUEST_SUBMITTED: {
+    icon: "📩",
+    bg: "bg-blue-50",
+    border: "border-blue-200",
+    text: "text-blue-700",
+    badge: "Join Request"
+  },
+  JOIN_REQUEST_APPROVED: {
+    icon: "🎉",
+    bg: "bg-emerald-50",
+    border: "border-emerald-200",
+    text: "text-emerald-700",
+    badge: "Approved"
+  },
+  JOIN_REQUEST_REJECTED: {
+    icon: "❌",
+    bg: "bg-rose-50",
+    border: "border-rose-200",
+    text: "text-rose-700",
+    badge: "Declined"
+  },
+  CONTACT_ADDED: {
+    icon: "📞",
+    bg: "bg-teal-50",
+    border: "border-teal-200",
+    text: "text-teal-700",
+    badge: "Contact"
+  },
   GENERAL: {
     icon: "🔔",
     bg: "bg-slate-50",
@@ -105,10 +161,13 @@ function NotificationBell({ societyId = null, size = "default" }) {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState("all"); // "all" | "unread"
+  const [viewAll, setViewAll] = useState(false);
   const [markingAll, setMarkingAll] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   const containerRef = useRef(null);
+
+  const activeSocietyId = viewAll ? null : societyId;
 
   // Polling for unread count & auto refresh on focus
   useEffect(() => {
@@ -116,7 +175,7 @@ function NotificationBell({ societyId = null, size = "default" }) {
 
     const loadCount = async () => {
       try {
-        const count = await getUnreadCount({ societyId });
+        const count = await getUnreadCount({ societyId: activeSocietyId });
         if (!cancelled) {
           setUnreadCount(count);
         }
@@ -138,9 +197,9 @@ function NotificationBell({ societyId = null, size = "default" }) {
       clearInterval(interval);
       window.removeEventListener("focus", handleFocus);
     };
-  }, [societyId, refreshTrigger]);
+  }, [activeSocietyId, refreshTrigger]);
 
-  // Fetch notifications list when opening dropdown or changing filter
+  // Fetch notifications list when opening dropdown, changing filter, or changing scope
   useEffect(() => {
     if (!isOpen) {
       return;
@@ -152,7 +211,7 @@ function NotificationBell({ societyId = null, size = "default" }) {
       setLoading(true);
       try {
         const data = await getNotifications({
-          societyId,
+          societyId: activeSocietyId,
           unreadOnly: filter === "unread",
           limit: 30
         });
@@ -174,7 +233,7 @@ function NotificationBell({ societyId = null, size = "default" }) {
     return () => {
       cancelled = true;
     };
-  }, [isOpen, filter, societyId, refreshTrigger]);
+  }, [isOpen, filter, activeSocietyId, refreshTrigger]);
 
   // Handle clicking outside to close
   useEffect(() => {
@@ -223,7 +282,7 @@ function NotificationBell({ societyId = null, size = "default" }) {
   const handleMarkAllRead = async () => {
     try {
       setMarkingAll(true);
-      await markAllAsRead(societyId);
+      await markAllAsRead(activeSocietyId);
       setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
       setUnreadCount(0);
       setRefreshTrigger((t) => t + 1);
@@ -253,7 +312,7 @@ function NotificationBell({ societyId = null, size = "default" }) {
 
   const handleClearAll = async () => {
     try {
-      await clearAllNotifications(societyId);
+      await clearAllNotifications(activeSocietyId);
       setNotifications([]);
       setUnreadCount(0);
       setRefreshTrigger((t) => t + 1);
@@ -342,30 +401,60 @@ function NotificationBell({ societyId = null, size = "default" }) {
             </div>
           </div>
 
-          {/* Filter Tabs */}
-          <div className="flex border-b border-slate-100 px-3 pt-2 bg-white gap-2 text-xs font-semibold">
-            <button
-              type="button"
-              onClick={() => setFilter("all")}
-              className={`pb-2 px-2 transition-colors cursor-pointer ${
-                filter === "all"
-                  ? "border-b-2 border-slate-900 text-slate-900"
-                  : "text-slate-400 hover:text-slate-700"
-              }`}
-            >
-              All ({notifications.length})
-            </button>
-            <button
-              type="button"
-              onClick={() => setFilter("unread")}
-              className={`pb-2 px-2 transition-colors cursor-pointer ${
-                filter === "unread"
-                  ? "border-b-2 border-slate-900 text-slate-900"
-                  : "text-slate-400 hover:text-slate-700"
-              }`}
-            >
-              Unread ({unreadCount})
-            </button>
+          {/* Scope and Filter Tabs */}
+          <div className="border-b border-slate-100 px-3 pt-2 bg-white">
+            {societyId && (
+              <div className="flex items-center gap-1.5 pb-2 mb-2 border-b border-slate-100 text-[11px] font-semibold text-slate-500">
+                <span>Scope:</span>
+                <button
+                  type="button"
+                  onClick={() => setViewAll(false)}
+                  className={`rounded-md px-2 py-0.5 transition cursor-pointer ${
+                    !viewAll
+                      ? "bg-slate-900 text-white"
+                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  }`}
+                >
+                  This Society
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewAll(true)}
+                  className={`rounded-md px-2 py-0.5 transition cursor-pointer ${
+                    viewAll
+                      ? "bg-slate-900 text-white"
+                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  }`}
+                >
+                  All Societies
+                </button>
+              </div>
+            )}
+
+            <div className="flex gap-2 text-xs font-semibold">
+              <button
+                type="button"
+                onClick={() => setFilter("all")}
+                className={`pb-2 px-2 transition-colors cursor-pointer ${
+                  filter === "all"
+                    ? "border-b-2 border-slate-900 text-slate-900"
+                    : "text-slate-400 hover:text-slate-700"
+                }`}
+              >
+                All ({notifications.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setFilter("unread")}
+                className={`pb-2 px-2 transition-colors cursor-pointer ${
+                  filter === "unread"
+                    ? "border-b-2 border-slate-900 text-slate-900"
+                    : "text-slate-400 hover:text-slate-700"
+                }`}
+              >
+                Unread ({unreadCount})
+              </button>
+            </div>
           </div>
 
           {/* Notification Items List */}
@@ -385,7 +474,7 @@ function NotificationBell({ societyId = null, size = "default" }) {
                 <p className="mt-1 text-xs text-slate-400">
                   {filter === "unread"
                     ? "You are completely caught up!"
-                    : "When meetings are scheduled or complaints are updated, you will see them here."}
+                    : "When meetings, complaints, bills, or announcements are updated, you will see them here."}
                 </p>
               </div>
             ) : (

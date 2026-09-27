@@ -205,9 +205,15 @@ export const updateComplaintStatus = async ({
       }).select("userId role");
 
       if (activeMembers.length > 0) {
-        const notifications = activeMembers.map((member) => {
-          const isCreator =
-            complaint.userId?._id && member.userId.toString() === complaint.userId._id.toString();
+        const creatorId = complaint.userId?._id?.toString() || complaint.userId?.toString();
+        const relevantMembers = activeMembers.filter((member) => {
+          const isCreator = creatorId && member.userId.toString() === creatorId;
+          const isSec = member.role === "SECRETARY";
+          return isCreator || isSec;
+        });
+
+        const notifications = relevantMembers.map((member) => {
+          const isCreator = creatorId && member.userId.toString() === creatorId;
           const isSec = member.role === "SECRETARY";
 
           let title = isResolved ? "Complaint Resolved" : "Complaint Rejected";

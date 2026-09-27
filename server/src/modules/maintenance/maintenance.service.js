@@ -1,8 +1,12 @@
 import crypto from "crypto";
 import Flat from "../../models/Flat.js";
 import MaintenanceBill from "../../models/MaintenanceBill.js";
+import Society from "../../models/Society.js";
+import SocietyMember from "../../models/SocietyMember.js";
 import getRazorpayClient from "../../config/razorpay.js";
+import { createBulkNotifications } from "../notifications/notification.service.js";
 import { createMaintenanceIncome } from "../finance/finance.service.js";
+import ApiError from "../../utils/apiError.js";
 import {
   createBill,
   createBills,
@@ -81,13 +85,21 @@ const createMaintenanceBill = async ({
   }).lean();
 
   if (!flat) {
-    throw new Error("Flat does not belong to this society");
+    throw new ApiError(
+      404,
+      "FLAT_NOT_FOUND",
+      "Flat does not belong to this society or does not exist"
+    );
   }
 
   const existingBill = await findBillByFlatAndMonth(societyId, flatId, month);
 
   if (existingBill) {
-    throw new Error(`Maintenance bill already exists for ${flat.flatNumber} for ${month}`);
+    throw new ApiError(
+      409,
+      "MAINTENANCE_BILL_EXISTS",
+      `Maintenance bill already exists for flat ${flat.flatNumber} for ${month}`
+    );
   }
 
   const amount = Number(maintenanceAmount);
@@ -113,6 +125,34 @@ const createMaintenanceBill = async ({
     createdBy
   });
 
+  try {
+    const activeMembers = await SocietyMember.find({
+      societyId,
+      flatId,
+      status: "ACTIVE"
+    }).select("userId");
+
+    if (activeMembers.length > 0) {
+      const notifications = activeMembers.map((member) => ({
+        recipientId: member.userId,
+        societyId,
+        type: "MAINTENANCE_BILL_GENERATED",
+        title: "Maintenance Bill Generated",
+        message: `Your maintenance bill of ₹${bill.totalAmount} for ${bill.month} is now available.`,
+        link: `/societies/${societyId}/maintenance`,
+        metadata: {
+          billId: bill._id,
+          month: bill.month,
+          amount: bill.totalAmount
+        }
+      }));
+
+      await createBulkNotifications(notifications);
+    }
+  } catch (err) {
+    console.error("Failed to notify members of maintenance bill:", err);
+  }
+
   return bill;
 };
 
@@ -135,6 +175,23 @@ const createMaintenanceBill = async ({
 //
 
 const generateMonthlyBills = async ({ societyId, createdBy, month, dueDate, lateFee = 0 }) => {
+  // 1. Verify society exists
+  const society = await Society.findById(societyId).select("_id name numberOfFlats").lean();
+  if (!society) {
+    throw new ApiError(404, "SOCIETY_NOT_FOUND", "The requested society does not exist");
+  }
+
+  // 2. Check total flats in the society
+  const totalFlatsCount = await Flat.countDocuments({ societyId });
+  if (totalFlatsCount === 0) {
+    throw new ApiError(
+      400,
+      "NO_FLATS_FOUND",
+      "No flats have been added to this society yet. Please add flats or approve resident join requests before generating bills."
+    );
+  }
+
+  // 3. Check occupied flats in the society
   const flats = await Flat.find({
     societyId,
     isOccupied: true
@@ -146,12 +203,11 @@ const generateMonthlyBills = async ({ societyId, createdBy, month, dueDate, late
     .lean();
 
   if (!flats.length) {
-    return {
-      month,
-      createdCount: 0,
-      skippedCount: 0,
-      bills: []
-    };
+    throw new ApiError(
+      400,
+      "NO_OCCUPIED_FLATS",
+      `None of the ${totalFlatsCount} flat(s) in this society are marked as occupied. Maintenance bills can only be generated for occupied flats.`
+    );
   }
 
   // ---------------------------------------------------
@@ -165,7 +221,11 @@ const generateMonthlyBills = async ({ societyId, createdBy, month, dueDate, late
   ];
 
   if (invalidFlatTypes.length) {
-    throw new Error(`Invalid flat type(s): ${invalidFlatTypes.join(", ")}`);
+    throw new ApiError(
+      400,
+      "INVALID_FLAT_TYPES",
+      `Invalid flat type(s) found in society flats: ${invalidFlatTypes.join(", ")}`
+    );
   }
 
   // ---------------------------------------------------
@@ -184,7 +244,11 @@ const generateMonthlyBills = async ({ societyId, createdBy, month, dueDate, late
   const missingFlatTypes = requiredFlatTypes.filter((flatType) => rateMap[flatType] === undefined);
 
   if (missingFlatTypes.length) {
-    throw new Error(`Maintenance rates are not configured for: ${missingFlatTypes.join(", ")}`);
+    throw new ApiError(
+      400,
+      "MAINTENANCE_RATES_NOT_CONFIGURED",
+      `Maintenance rates have not been configured for flat type(s): ${missingFlatTypes.join(", ")}. Please configure rates in Maintenance Rates settings first.`
+    );
   }
 
   // ---------------------------------------------------
@@ -238,16 +302,15 @@ const generateMonthlyBills = async ({ societyId, createdBy, month, dueDate, late
   }
 
   // ---------------------------------------------------
-  // No new bills
+  // No new bills - all already generated
   // ---------------------------------------------------
 
   if (!billsToCreate.length) {
-    return {
-      month,
-      createdCount: 0,
-      skippedCount: existingBills.length,
-      bills: []
-    };
+    throw new ApiError(
+      400,
+      "BILLS_ALREADY_GENERATED",
+      `All ${flats.length} occupied flat(s) already have maintenance bills generated for ${month}.`
+    );
   }
 
   // ---------------------------------------------------
@@ -263,15 +326,58 @@ const generateMonthlyBills = async ({ societyId, createdBy, month, dueDate, late
     // created concurrently, return
     // a clean application error.
     if (error?.code === 11000) {
-      throw new Error(
-        "Some maintenance bills already exist for this month. Please refresh and try again.",
-        {
-          cause: error
-        }
+      throw new ApiError(
+        409,
+        "DUPLICATE_BILLS",
+        "Some maintenance bills already exist for this month. Please refresh and try again."
       );
     }
 
     throw error;
+  }
+
+  try {
+    if (createdBills && createdBills.length > 0) {
+      const billedFlatIds = createdBills.map((b) => b.flatId);
+      const activeMembers = await SocietyMember.find({
+        societyId,
+        flatId: { $in: billedFlatIds },
+        status: "ACTIVE"
+      }).select("userId flatId");
+
+      if (activeMembers.length > 0) {
+        const billMapByFlat = new Map();
+        for (const b of createdBills) {
+          billMapByFlat.set(normalizeId(b.flatId), b);
+        }
+
+        const notifications = [];
+        for (const member of activeMembers) {
+          const billForFlat = billMapByFlat.get(normalizeId(member.flatId));
+          if (billForFlat) {
+            notifications.push({
+              recipientId: member.userId,
+              societyId,
+              type: "MAINTENANCE_BILL_GENERATED",
+              title: "Maintenance Bill Generated",
+              message: `Your maintenance bill of ₹${billForFlat.totalAmount} for ${month} has been generated.`,
+              link: `/societies/${societyId}/maintenance`,
+              metadata: {
+                billId: billForFlat._id,
+                month,
+                amount: billForFlat.totalAmount
+              }
+            });
+          }
+        }
+
+        if (notifications.length > 0) {
+          await createBulkNotifications(notifications);
+        }
+      }
+    }
+  } catch (err) {
+    console.error("Failed to notify residents of monthly maintenance bills:", err);
   }
 
   return {
@@ -412,10 +518,11 @@ const markOverdueBills = async ({ societyId, month }) => {
       $lt: now
     }
   })
-    .select("_id maintenanceAmount lateFee")
+    .select("_id flatId maintenanceAmount lateFee")
     .lean();
 
   let updatedCount = 0;
+  const overdueBills = [];
 
   for (const bill of bills) {
     const maintenanceAmount = Number(bill.maintenanceAmount || 0);
@@ -428,7 +535,52 @@ const markOverdueBills = async ({ societyId, month }) => {
 
     if (updated) {
       updatedCount += 1;
+      overdueBills.push({ ...bill, totalAmount });
     }
+  }
+
+  try {
+    if (overdueBills.length > 0) {
+      const overdueFlatIds = overdueBills.map((b) => b.flatId).filter(Boolean);
+      const activeMembers = await SocietyMember.find({
+        societyId,
+        flatId: { $in: overdueFlatIds },
+        status: "ACTIVE"
+      }).select("userId flatId");
+
+      if (activeMembers.length > 0) {
+        const billMapByFlat = new Map();
+        for (const b of overdueBills) {
+          billMapByFlat.set(normalizeId(b.flatId), b);
+        }
+
+        const notifications = [];
+        for (const member of activeMembers) {
+          const b = billMapByFlat.get(normalizeId(member.flatId));
+          if (b) {
+            notifications.push({
+              recipientId: member.userId,
+              societyId,
+              type: "MAINTENANCE_OVERDUE",
+              title: "Maintenance Bill Overdue",
+              message: `Your maintenance bill for ${month} is overdue (₹${b.totalAmount} including late fee).`,
+              link: `/societies/${societyId}/maintenance`,
+              metadata: {
+                billId: b._id,
+                month,
+                amount: b.totalAmount
+              }
+            });
+          }
+        }
+
+        if (notifications.length > 0) {
+          await createBulkNotifications(notifications);
+        }
+      }
+    }
+  } catch (err) {
+    console.error("Failed to notify members of overdue maintenance bills:", err);
   }
 
   return {
@@ -638,6 +790,34 @@ const recordOfflinePayment = async ({
     bill,
     userId
   });
+
+  try {
+    const activeMembers = await SocietyMember.find({
+      societyId,
+      flatId: bill.flatId,
+      status: "ACTIVE"
+    }).select("userId");
+
+    if (activeMembers.length > 0) {
+      const notifications = activeMembers.map((member) => ({
+        recipientId: member.userId,
+        societyId,
+        type: "MAINTENANCE_PAYMENT_SUCCESS",
+        title: "Maintenance Payment Recorded",
+        message: `Offline payment of ₹${paymentAmount} for ${bill.month} has been recorded (Receipt #${receiptNumber}).`,
+        link: `/societies/${societyId}/maintenance`,
+        metadata: {
+          billId,
+          receiptNumber,
+          amount: paymentAmount
+        }
+      }));
+
+      await createBulkNotifications(notifications);
+    }
+  } catch (err) {
+    console.error("Failed to notify resident of offline payment:", err);
+  }
 
   return payment;
 };
@@ -1076,6 +1256,55 @@ const verifyMaintenancePayment = async ({
     bill,
     userId
   });
+
+  try {
+    const activeMembers = await SocietyMember.find({
+      societyId,
+      flatId: bill.flatId,
+      status: "ACTIVE"
+    }).select("userId");
+
+    const notifications = activeMembers.map((member) => ({
+      recipientId: member.userId,
+      societyId,
+      type: "MAINTENANCE_PAYMENT_SUCCESS",
+      title: "Payment Successful",
+      message: `Your payment of ₹${bill.totalAmount} for ${bill.month} maintenance was successful (Receipt #${receiptNumber}).`,
+      link: `/societies/${societyId}/maintenance`,
+      metadata: {
+        billId,
+        paymentId: updatedPayment._id,
+        receiptNumber,
+        amount: bill.totalAmount
+      }
+    }));
+
+    const society = await Society.findById(societyId).select("secretary");
+    if (society?.secretary) {
+      const flat = await Flat.findById(bill.flatId).select("wing flatNumber");
+      const flatLabel = flat ? `Flat ${flat.wing}-${flat.flatNumber}` : "Flat";
+      notifications.push({
+        recipientId: society.secretary,
+        societyId,
+        type: "MAINTENANCE_PAYMENT_SUCCESS",
+        title: "Maintenance Payment Received",
+        message: `Payment of ₹${bill.totalAmount} received for ${bill.month} from ${flatLabel}.`,
+        link: `/societies/${societyId}/maintenance/dashboard`,
+        metadata: {
+          billId,
+          paymentId: updatedPayment._id,
+          receiptNumber,
+          amount: bill.totalAmount
+        }
+      });
+    }
+
+    if (notifications.length > 0) {
+      await createBulkNotifications(notifications);
+    }
+  } catch (err) {
+    console.error("Failed to send payment notifications:", err);
+  }
 
   return updatedPayment;
 };

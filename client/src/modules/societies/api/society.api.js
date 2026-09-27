@@ -13,6 +13,11 @@ export const verifySocietyCode = async (joiningCode) => {
   return response.data.data.society;
 };
 
+export const submitSocietyJoinRequest = async (societyId, payload) => {
+  const response = await apiClient.post(`/societies/${societyId}/join-request`, payload);
+  return response.data.data;
+};
+
 export const joinSociety = async (societyId, payload) => {
   const response = await apiClient.post(`/societies/${societyId}/join`, payload);
   return response.data.data.society;

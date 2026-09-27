@@ -10,6 +10,7 @@ import {
   getSocietyMembersController,
   getSocietyJoinRequestsController,
   joinSocietyController,
+  submitSocietyJoinRequestController,
   approveSocietyJoinRequestController,
   rejectSocietyJoinRequestController,
   verifyJoiningCodeController
@@ -23,6 +24,7 @@ router.use(authenticate);
 router.get("/my-societies", getMySocietiesController);
 router.post("/verify-code", verifyJoiningCodeController);
 router.post("/", createSocietyController);
+router.post("/:societyId/join-request", submitSocietyJoinRequestController);
 router.post("/:societyId/join", joinSocietyController);
 
 router.get("/:societyId", requireSocietyMember, getSocietyController);

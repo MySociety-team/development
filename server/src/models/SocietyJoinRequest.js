@@ -37,6 +37,52 @@ const societyJoinRequestSchema = new Schema(
     completedAt: {
       type: Date,
       default: null
+    },
+
+    flatNumber: {
+      type: String,
+      trim: true,
+      default: ""
+    },
+
+    floor: {
+      type: Number,
+      default: null
+    },
+
+    wing: {
+      type: String,
+      trim: true,
+      default: ""
+    },
+
+    addressNote: {
+      type: String,
+      trim: true,
+      default: ""
+    },
+
+    flatType: {
+      type: String,
+      enum: ["1RK", "1BHK", "2BHK", "3BHK", "4BHK", "5BHK", ""],
+      default: "2BHK"
+    },
+
+    memberType: {
+      type: String,
+      enum: ["OWNER", "TENANT", "FAMILY_MEMBER"],
+      default: "OWNER"
+    },
+
+    mobileNumber: {
+      type: String,
+      trim: true,
+      default: ""
+    },
+
+    invitedEmails: {
+      type: [String],
+      default: []
     }
   },
   {

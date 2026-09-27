@@ -1,11 +1,14 @@
-import { Link, useNavigate } from "react-router";
+import { Link, useNavigate, useParams } from "react-router";
 
 import { useAuth } from "../../modules/auth/hooks/useAuth.js";
 import NotificationBell from "../../modules/notifications/components/NotificationBell.jsx";
 
 function AppShell({ title, description, backTo, children, societyId = null }) {
   const navigate = useNavigate();
+  const params = useParams();
   const { user, logout } = useAuth();
+
+  const effectiveSocietyId = societyId || params.societyId || null;
 
   const handleLogout = async () => {
     await logout();
@@ -34,7 +37,7 @@ function AppShell({ title, description, backTo, children, societyId = null }) {
           </div>
 
           <div className="flex items-center gap-3">
-            {user && <NotificationBell societyId={societyId} />}
+            {user && <NotificationBell societyId={effectiveSocietyId} />}
 
             <div className="hidden text-right sm:block">
               <p className="text-sm font-semibold text-slate-900">{user?.name ?? "Account"}</p>

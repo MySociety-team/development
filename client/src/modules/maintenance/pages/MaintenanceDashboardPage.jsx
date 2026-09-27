@@ -151,10 +151,16 @@ const MaintenanceDashboardPage = () => {
   // ===================================================
 
   const [showGenerateModal, setShowGenerateModal] = useState(false);
+  const [generateError, setGenerateError] = useState("");
+  const [generating, setGenerating] = useState(false);
 
   const [showEditModal, setShowEditModal] = useState(false);
+  const [editError, setEditError] = useState("");
+  const [editing, setEditing] = useState(false);
 
   const [showOfflineModal, setShowOfflineModal] = useState(false);
+  const [offlineError, setOfflineError] = useState("");
+  const [recordingOffline, setRecordingOffline] = useState(false);
 
   const [selectedBill, setSelectedBill] = useState(null);
 
@@ -469,19 +475,18 @@ const MaintenanceDashboardPage = () => {
     e.preventDefault();
 
     try {
+      setGenerateError("");
       setError("");
       setMessage("");
+      setGenerating(true);
 
       const result = await generateMonthlyBills(societyId, {
         month: generateForm.month,
-
         dueDate: generateForm.dueDate,
-
         lateFee: Number(generateForm.lateFee || 0)
       });
 
       const createdCount = Number(result?.createdCount || 0);
-
       const skippedCount = Number(result?.skippedCount || 0);
 
       // -----------------------------------------------
@@ -530,8 +535,11 @@ const MaintenanceDashboardPage = () => {
       await loadDashboard();
     } catch (err) {
       console.error("Generate bills error:", err);
-
-      setError(err?.response?.data?.message || err?.message || "Failed to generate bills");
+      const errorMsg = err?.response?.data?.message || err?.message || "Failed to generate bills";
+      setGenerateError(errorMsg);
+      setError(errorMsg);
+    } finally {
+      setGenerating(false);
     }
   };
 
@@ -541,14 +549,12 @@ const MaintenanceDashboardPage = () => {
 
   const openEditModal = (bill) => {
     setSelectedBill(bill);
+    setEditError("");
 
     setEditForm({
       maintenanceAmount: bill?.maintenanceAmount ?? "",
-
       dueDate: bill?.dueDate ? new Date(bill.dueDate).toISOString().split("T")[0] : "",
-
       lateFee: bill?.lateFee ?? "",
-
       adjustmentReason: bill?.adjustmentReason || ""
     });
 
@@ -563,36 +569,32 @@ const MaintenanceDashboardPage = () => {
     e.preventDefault();
 
     if (!selectedBill) {
-      setError("No bill selected.");
-
+      setEditError("No bill selected.");
       return;
     }
 
     const billId = getBillId(selectedBill);
 
     if (!billId) {
-      setError("Bill ID is missing.");
-
+      setEditError("Bill ID is missing.");
       return;
     }
 
     if (!editForm.adjustmentReason.trim()) {
-      setError("Adjustment reason is required when editing a maintenance bill.");
-
+      setEditError("Adjustment reason is required when editing a maintenance bill.");
       return;
     }
 
     try {
+      setEditError("");
       setError("");
       setMessage("");
+      setEditing(true);
 
       await updateMaintenanceBill(societyId, billId, {
         maintenanceAmount: Number(editForm.maintenanceAmount),
-
         dueDate: editForm.dueDate,
-
         lateFee: Number(editForm.lateFee || 0),
-
         adjustmentReason: editForm.adjustmentReason.trim()
       });
 
@@ -604,8 +606,11 @@ const MaintenanceDashboardPage = () => {
       await loadDashboard();
     } catch (err) {
       console.error("Update bill error:", err);
-
-      setError(err?.response?.data?.message || err?.message || "Failed to update bill");
+      const errorMsg = err?.response?.data?.message || err?.message || "Failed to update bill";
+      setEditError(errorMsg);
+      setError(errorMsg);
+    } finally {
+      setEditing(false);
     }
   };
 
@@ -615,16 +620,13 @@ const MaintenanceDashboardPage = () => {
 
   const openOfflinePaymentModal = (bill = null) => {
     setSelectedBill(bill);
+    setOfflineError("");
 
     setOfflineForm({
       billId: bill ? getBillId(bill) : "",
-
       amount: bill ? bill.totalAmount : "",
-
       paymentMethod: "CASH",
-
       paymentDate: new Date().toISOString().split("T")[0],
-
       transactionId: ""
     });
 
@@ -639,24 +641,21 @@ const MaintenanceDashboardPage = () => {
     e.preventDefault();
 
     if (!offlineForm.billId) {
-      setError("Please select a bill.");
-
+      setOfflineError("Please select a bill.");
       return;
     }
 
     try {
+      setOfflineError("");
       setError("");
       setMessage("");
+      setRecordingOffline(true);
 
       await recordOfflineMaintenancePayment(societyId, {
         billId: offlineForm.billId,
-
         amount: Number(offlineForm.amount),
-
         paymentMethod: offlineForm.paymentMethod,
-
         paymentDate: offlineForm.paymentDate,
-
         transactionId: offlineForm.transactionId
       });
 
@@ -668,8 +667,12 @@ const MaintenanceDashboardPage = () => {
       await loadDashboard();
     } catch (err) {
       console.error("Offline payment error:", err);
-
-      setError(err?.response?.data?.message || err?.message || "Failed to record offline payment");
+      const errorMsg =
+        err?.response?.data?.message || err?.message || "Failed to record offline payment";
+      setOfflineError(errorMsg);
+      setError(errorMsg);
+    } finally {
+      setRecordingOffline(false);
     }
   };
 
@@ -956,6 +959,7 @@ const MaintenanceDashboardPage = () => {
 
               <button
                 onClick={() => {
+                  setGenerateError("");
                   setGenerateForm({
                     month,
                     dueDate: "",
@@ -1370,6 +1374,15 @@ const MaintenanceDashboardPage = () => {
             </div>
 
             <form onSubmit={handleGenerateBills} className="space-y-4">
+              {generateError && (
+                <div className="flex items-start gap-2.5 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 shadow-xs">
+                  <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-red-100 text-xs font-bold text-red-600">
+                    !
+                  </div>
+                  <div className="flex-1 font-medium leading-relaxed">{generateError}</div>
+                </div>
+              )}
+
               {/* MONTH */}
 
               <div>
@@ -1379,12 +1392,13 @@ const MaintenanceDashboardPage = () => {
                   type="month"
                   required
                   value={generateForm.month}
-                  onChange={(e) =>
+                  onChange={(e) => {
+                    setGenerateError("");
                     setGenerateForm({
                       ...generateForm,
                       month: e.target.value
-                    })
-                  }
+                    });
+                  }}
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-blue-500"
                 />
               </div>
@@ -1398,12 +1412,13 @@ const MaintenanceDashboardPage = () => {
                   type="date"
                   required
                   value={generateForm.dueDate}
-                  onChange={(e) =>
+                  onChange={(e) => {
+                    setGenerateError("");
                     setGenerateForm({
                       ...generateForm,
                       dueDate: e.target.value
-                    })
-                  }
+                    });
+                  }}
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-blue-500"
                 />
               </div>
@@ -1446,12 +1461,13 @@ const MaintenanceDashboardPage = () => {
                   type="number"
                   min="0"
                   value={generateForm.lateFee}
-                  onChange={(e) =>
+                  onChange={(e) => {
+                    setGenerateError("");
                     setGenerateForm({
                       ...generateForm,
                       lateFee: e.target.value
-                    })
-                  }
+                    });
+                  }}
                   placeholder="100"
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-blue-500"
                 />
@@ -1474,9 +1490,10 @@ const MaintenanceDashboardPage = () => {
 
                 <button
                   type="submit"
-                  className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                  disabled={generating}
+                  className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-400"
                 >
-                  Generate
+                  {generating ? "Generating..." : "Generate"}
                 </button>
               </div>
             </form>
@@ -1504,6 +1521,15 @@ const MaintenanceDashboardPage = () => {
             </div>
 
             <form onSubmit={handleUpdateBill} className="space-y-4">
+              {editError && (
+                <div className="flex items-start gap-2.5 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 shadow-xs">
+                  <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-red-100 text-xs font-bold text-red-600">
+                    !
+                  </div>
+                  <div className="flex-1 font-medium leading-relaxed">{editError}</div>
+                </div>
+              )}
+
               {/* MAINTENANCE AMOUNT */}
 
               <div>
@@ -1604,9 +1630,10 @@ const MaintenanceDashboardPage = () => {
 
                 <button
                   type="submit"
-                  className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                  disabled={editing}
+                  className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-400"
                 >
-                  Save Changes
+                  {editing ? "Saving..." : "Save Changes"}
                 </button>
               </div>
             </form>
@@ -1634,6 +1661,15 @@ const MaintenanceDashboardPage = () => {
             </div>
 
             <form onSubmit={handleOfflinePayment} className="space-y-4">
+              {offlineError && (
+                <div className="flex items-start gap-2.5 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 shadow-xs">
+                  <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-red-100 text-xs font-bold text-red-600">
+                    !
+                  </div>
+                  <div className="flex-1 font-medium leading-relaxed">{offlineError}</div>
+                </div>
+              )}
+
               {/* BILL */}
 
               <div>
@@ -1765,9 +1801,10 @@ const MaintenanceDashboardPage = () => {
 
                 <button
                   type="submit"
-                  className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
+                  disabled={recordingOffline}
+                  className="flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-green-400"
                 >
-                  Record Payment
+                  {recordingOffline ? "Recording..." : "Record Payment"}
                 </button>
               </div>
             </form>

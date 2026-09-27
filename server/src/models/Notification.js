@@ -25,6 +25,14 @@ const notificationSchema = new Schema(
           "COMPLAINT_RESOLVED",
           "COMPLAINT_REJECTED",
           "MEMBER_JOINED",
+          "ANNOUNCEMENT_CREATED",
+          "MAINTENANCE_BILL_GENERATED",
+          "MAINTENANCE_PAYMENT_SUCCESS",
+          "MAINTENANCE_OVERDUE",
+          "JOIN_REQUEST_SUBMITTED",
+          "JOIN_REQUEST_APPROVED",
+          "JOIN_REQUEST_REJECTED",
+          "CONTACT_ADDED",
           "GENERAL"
         ],
         message: "Invalid notification type"
