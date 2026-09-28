@@ -98,11 +98,12 @@ function ComplaintsPage() {
     }
   };
 
-  const handleStatusUpdate = async (complaintId, newStatus, resolutionNote) => {
+  const handleStatusUpdate = async (complaintId, newStatus, resolutionNote, resolutionImage) => {
     try {
       await updateComplaintStatus(societyId, complaintId, {
         status: newStatus,
-        resolutionNote
+        resolutionNote,
+        resolutionImage: resolutionImage || ""
       });
       await loadComplaints();
     } catch (err) {

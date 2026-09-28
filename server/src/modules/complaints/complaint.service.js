@@ -24,7 +24,7 @@ export const createComplaint = async ({ societyId, userId, flatId, payload }) =>
     throw new ApiError(400, "SOCIETY_ID_INVALID", "Society ID is invalid");
   }
 
-  const { title, description, category } = payload;
+  const { title, description, category, images } = payload;
 
   if (!title || !title.trim()) {
     throw new ApiError(400, "TITLE_REQUIRED", "Complaint title is required");
@@ -34,6 +34,10 @@ export const createComplaint = async ({ societyId, userId, flatId, payload }) =>
     throw new ApiError(400, "DESCRIPTION_REQUIRED", "Complaint description is required");
   }
 
+  const sanitizedImages = Array.isArray(images)
+    ? images.filter((img) => typeof img === "string" && img.trim().length > 0)
+    : [];
+
   const complaint = await Complaint.create({
     societyId,
     userId,
@@ -41,6 +45,7 @@ export const createComplaint = async ({ societyId, userId, flatId, payload }) =>
     title: title.trim(),
     description: description.trim(),
     category: category || "OTHER",
+    images: sanitizedImages,
     status: "pending"
   });
 
@@ -104,6 +109,7 @@ export const updateComplaintStatus = async ({
   complaintId,
   status,
   resolutionNote,
+  resolutionImage,
   userId,
   userRole
 }) => {
@@ -173,6 +179,12 @@ export const updateComplaintStatus = async ({
   const updateFields = {
     status,
     resolutionNote: resolutionNote ? resolutionNote.trim() : "",
+    resolutionImage:
+      status === "pending"
+        ? ""
+        : typeof resolutionImage === "string"
+          ? resolutionImage.trim()
+          : existingComplaint.resolutionImage || "",
     resolvedBy: status === "pending" ? null : userId,
     resolvedAt: status === "pending" ? null : new Date()
   };

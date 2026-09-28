@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import StatusBadge from "../../../components/common/StatusBadge.jsx";
 import Modal from "../../../components/common/Modal.jsx";
 import Button from "../../../components/common/Button.jsx";
+import { compressImage, formatFileSize } from "../../../utils/imageCompressor.js";
 
 const CATEGORY_COLORS = {
   PLUMBING: "bg-cyan-50 text-cyan-700 border-cyan-200",
@@ -27,8 +28,18 @@ function ComplaintCard({ complaint, currentUser, userRole, onStatusUpdate, onDel
     status: null // "resolved" | "rejected"
   });
   const [note, setNote] = useState("");
+  const [resolutionImg, setResolutionImg] = useState(null);
+  const [compressingImg, setCompressingImg] = useState(false);
   const [noteError, setNoteError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const resolutionFileInputRef = useRef(null);
+
+  // Lightbox preview modal state
+  const [previewModal, setPreviewModal] = useState({
+    isOpen: false,
+    imageUrl: "",
+    title: ""
+  });
 
   const formattedDate = new Date(complaint.createdAt).toLocaleDateString("en-US", {
     month: "short",
@@ -54,6 +65,7 @@ function ComplaintCard({ complaint, currentUser, userRole, onStatusUpdate, onDel
       status: targetStatus
     });
     setNote("");
+    setResolutionImg(null);
     setNoteError("");
   };
 
@@ -63,7 +75,33 @@ function ComplaintCard({ complaint, currentUser, userRole, onStatusUpdate, onDel
       status: null
     });
     setNote("");
+    setResolutionImg(null);
     setNoteError("");
+  };
+
+  const handleResolutionFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    try {
+      setCompressingImg(true);
+      setNoteError("");
+      const compressed = await compressImage(file, {
+        maxWidth: 1280,
+        maxHeight: 1280,
+        quality: 0.75
+      });
+      setResolutionImg(compressed);
+    } catch (err) {
+      setNoteError(err?.message || "Failed to process photo.");
+    } finally {
+      setCompressingImg(false);
+      if (resolutionFileInputRef.current) {
+        resolutionFileInputRef.current.value = "";
+      }
+    }
   };
 
   const handleSubmitStatus = async (e) => {
@@ -80,7 +118,12 @@ function ComplaintCard({ complaint, currentUser, userRole, onStatusUpdate, onDel
     try {
       setSubmitting(true);
       setNoteError("");
-      await onStatusUpdate(complaint._id, actionModal.status, note.trim());
+      await onStatusUpdate(
+        complaint._id,
+        actionModal.status,
+        note.trim(),
+        resolutionImg?.dataUrl || ""
+      );
       closeStatusDialog();
     } catch (err) {
       setNoteError(err?.message || "Failed to update complaint status.");
@@ -113,47 +156,154 @@ function ComplaintCard({ complaint, currentUser, userRole, onStatusUpdate, onDel
           {complaint.description}
         </p>
 
-        {/* Resolution note display for resolved complaints */}
-        {complaint.status === "resolved" && complaint.resolutionNote && (
-          <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50/70 p-4">
-            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-emerald-800">
-              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-200 text-emerald-800 text-xs">
-                ✓
-              </span>
-              Resolution Details
-            </div>
-            <p className="mt-2 text-sm text-emerald-950 whitespace-pre-line font-normal">
-              {complaint.resolutionNote}
+        {/* Attached Photos by complainant */}
+        {complaint.images && complaint.images.length > 0 && (
+          <div className="mt-4 rounded-xl border border-slate-100 bg-slate-50/70 p-3.5">
+            <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2.5 flex items-center gap-1.5">
+              <span>📷</span>
+              <span>Attached Photos ({complaint.images.length})</span>
             </p>
-            {(formattedResolvedDate || complaint.resolvedBy?.name) && (
-              <p className="mt-2 text-xs text-emerald-700">
-                Resolved {complaint.resolvedBy?.name ? `by ${complaint.resolvedBy.name}` : ""}{" "}
-                {formattedResolvedDate ? `on ${formattedResolvedDate}` : ""}
-              </p>
-            )}
+            <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-2.5">
+              {complaint.images.map((imgUrl, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() =>
+                    setPreviewModal({
+                      isOpen: true,
+                      imageUrl: imgUrl,
+                      title: `${complaint.title} - Photo #${idx + 1}`
+                    })
+                  }
+                  className="group relative aspect-square overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs hover:border-blue-400 focus:outline-none transition cursor-pointer"
+                >
+                  <img
+                    src={imgUrl}
+                    alt={`Complaint image ${idx + 1}`}
+                    className="h-full w-full object-cover group-hover:scale-105 transition duration-200"
+                  />
+                  <div className="absolute inset-0 bg-slate-900/30 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
+                    <span className="rounded-lg bg-white/90 px-2 py-1 text-[11px] font-semibold text-slate-800 shadow">
+                      View
+                    </span>
+                  </div>
+                </button>
+              ))}
+            </div>
           </div>
         )}
 
-        {/* Rejection reason display for rejected complaints */}
-        {complaint.status === "rejected" && complaint.resolutionNote && (
-          <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50/70 p-4">
-            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-rose-800">
-              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-rose-200 text-rose-800 text-xs">
-                ✕
-              </span>
-              Reason for Rejection
+        {/* Resolution display for resolved complaints */}
+        {complaint.status === "resolved" &&
+          (complaint.resolutionNote || complaint.resolutionImage) && (
+            <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50/70 p-4">
+              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-emerald-800">
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-200 text-emerald-800 text-xs">
+                  ✓
+                </span>
+                Resolution Details
+              </div>
+              {complaint.resolutionNote && (
+                <p className="mt-2 text-sm text-emerald-950 whitespace-pre-line font-normal">
+                  {complaint.resolutionNote}
+                </p>
+              )}
+
+              {complaint.resolutionImage && (
+                <div className="mt-3">
+                  <p className="text-xs font-semibold text-emerald-800 mb-1.5 flex items-center gap-1">
+                    <span>📸</span>
+                    <span>Resolution Proof / Photo:</span>
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setPreviewModal({
+                        isOpen: true,
+                        imageUrl: complaint.resolutionImage,
+                        title: `${complaint.title} - Resolution Proof`
+                      })
+                    }
+                    className="group relative inline-block overflow-hidden rounded-xl border border-emerald-300 bg-white shadow-xs hover:border-emerald-500 focus:outline-none transition cursor-pointer"
+                  >
+                    <img
+                      src={complaint.resolutionImage}
+                      alt="Resolution proof"
+                      className="h-28 w-44 object-cover group-hover:scale-105 transition duration-200"
+                    />
+                    <div className="absolute inset-0 bg-emerald-950/20 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
+                      <span className="rounded-lg bg-white/90 px-2 py-1 text-[11px] font-semibold text-emerald-900 shadow">
+                        Enlarge Proof
+                      </span>
+                    </div>
+                  </button>
+                </div>
+              )}
+
+              {(formattedResolvedDate || complaint.resolvedBy?.name) && (
+                <p className="mt-2 text-xs text-emerald-700">
+                  Resolved {complaint.resolvedBy?.name ? `by ${complaint.resolvedBy.name}` : ""}{" "}
+                  {formattedResolvedDate ? `on ${formattedResolvedDate}` : ""}
+                </p>
+              )}
             </div>
-            <p className="mt-2 text-sm text-rose-950 whitespace-pre-line font-normal">
-              {complaint.resolutionNote}
-            </p>
-            {(formattedResolvedDate || complaint.resolvedBy?.name) && (
-              <p className="mt-2 text-xs text-rose-700">
-                Reviewed {complaint.resolvedBy?.name ? `by ${complaint.resolvedBy.name}` : ""}{" "}
-                {formattedResolvedDate ? `on ${formattedResolvedDate}` : ""}
-              </p>
-            )}
-          </div>
-        )}
+          )}
+
+        {/* Rejection display for rejected complaints */}
+        {complaint.status === "rejected" &&
+          (complaint.resolutionNote || complaint.resolutionImage) && (
+            <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50/70 p-4">
+              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-rose-800">
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-rose-200 text-rose-800 text-xs">
+                  ✕
+                </span>
+                Reason for Rejection
+              </div>
+              {complaint.resolutionNote && (
+                <p className="mt-2 text-sm text-rose-950 whitespace-pre-line font-normal">
+                  {complaint.resolutionNote}
+                </p>
+              )}
+
+              {complaint.resolutionImage && (
+                <div className="mt-3">
+                  <p className="text-xs font-semibold text-rose-800 mb-1.5 flex items-center gap-1">
+                    <span>📸</span>
+                    <span>Rejection Reference Photo:</span>
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setPreviewModal({
+                        isOpen: true,
+                        imageUrl: complaint.resolutionImage,
+                        title: `${complaint.title} - Rejection Reference Photo`
+                      })
+                    }
+                    className="group relative inline-block overflow-hidden rounded-xl border border-rose-300 bg-white shadow-xs hover:border-rose-500 focus:outline-none transition cursor-pointer"
+                  >
+                    <img
+                      src={complaint.resolutionImage}
+                      alt="Rejection reference"
+                      className="h-28 w-44 object-cover group-hover:scale-105 transition duration-200"
+                    />
+                    <div className="absolute inset-0 bg-rose-950/20 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
+                      <span className="rounded-lg bg-white/90 px-2 py-1 text-[11px] font-semibold text-rose-900 shadow">
+                        Enlarge Photo
+                      </span>
+                    </div>
+                  </button>
+                </div>
+              )}
+
+              {(formattedResolvedDate || complaint.resolvedBy?.name) && (
+                <p className="mt-2 text-xs text-rose-700">
+                  Reviewed {complaint.resolvedBy?.name ? `by ${complaint.resolvedBy.name}` : ""}{" "}
+                  {formattedResolvedDate ? `on ${formattedResolvedDate}` : ""}
+                </p>
+              )}
+            </div>
+          )}
 
         <div className="mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-slate-50 pt-4 text-xs">
           <div className="flex items-center gap-2">
@@ -225,10 +375,7 @@ function ComplaintCard({ complaint, currentUser, userRole, onStatusUpdate, onDel
                 </>
               )}
 
-              {/* Delete button:
-                  - For Secretary complaints: ONLY the resident creator (isOwner) can delete. Secretary CANNOT delete.
-                  - For standard complaints: Owner or Secretary can delete.
-              */}
+              {/* Delete button */}
               {isSecretaryComplaint && isOwner && (
                 <button
                   type="button"
@@ -281,7 +428,7 @@ function ComplaintCard({ complaint, currentUser, userRole, onStatusUpdate, onDel
         </div>
       </div>
 
-      {/* Action Dialog for Resolution or Rejection */}
+      {/* Action Dialog for Resolution or Rejection with Optional Picture */}
       <Modal
         isOpen={actionModal.isOpen}
         title={actionModal.status === "resolved" ? "Resolve Complaint" : "Reject Complaint"}
@@ -306,7 +453,7 @@ function ComplaintCard({ complaint, currentUser, userRole, onStatusUpdate, onDel
               )}
             </label>
             <textarea
-              rows={4}
+              rows={3}
               value={note}
               onChange={(e) => {
                 setNote(e.target.value);
@@ -341,6 +488,89 @@ function ComplaintCard({ complaint, currentUser, userRole, onStatusUpdate, onDel
             </div>
           </div>
 
+          {/* Optional Picture Upload for Secretary / Resolver */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-sm font-semibold text-slate-800">
+                {actionModal.status === "resolved" ? "Resolution Photo / Proof" : "Reference Photo"}{" "}
+                <span className="text-xs text-slate-400 font-normal">(Optional)</span>
+              </label>
+              {resolutionImg && (
+                <button
+                  type="button"
+                  onClick={() => setResolutionImg(null)}
+                  className="text-xs text-rose-600 hover:text-rose-700 font-medium cursor-pointer"
+                >
+                  Remove Photo
+                </button>
+              )}
+            </div>
+
+            {!resolutionImg ? (
+              <div
+                onClick={() => resolutionFileInputRef.current?.click()}
+                className="group flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-200 bg-slate-50/60 p-3.5 text-center cursor-pointer hover:border-blue-400 hover:bg-slate-50 transition"
+              >
+                <input
+                  ref={resolutionFileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleResolutionFileChange}
+                  className="hidden"
+                />
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-200 text-slate-600 mb-1.5 group-hover:scale-105 transition">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-4 w-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
+                    />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"
+                    />
+                  </svg>
+                </div>
+                <p className="text-xs font-semibold text-slate-700">
+                  {compressingImg ? "Processing photo..." : "Upload proof or reference picture"}
+                </p>
+                <p className="text-[11px] text-slate-400 mt-0.5">Click to choose image</p>
+              </div>
+            ) : (
+              <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-slate-50 p-2 flex items-center gap-3">
+                <img
+                  src={resolutionImg.dataUrl}
+                  alt="Resolution attachment preview"
+                  className="h-16 w-24 object-cover rounded-lg border border-slate-200"
+                />
+                <div className="flex-1 min-w-0 text-xs">
+                  <p className="font-semibold text-slate-800 truncate">{resolutionImg.name}</p>
+                  <p className="text-slate-400 mt-0.5">{formatFileSize(resolutionImg.size)}</p>
+                  <span className="inline-flex items-center gap-1 mt-1 text-[11px] font-medium text-emerald-600">
+                    <span>✓</span> Attached
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setResolutionImg(null)}
+                  className="flex h-7 w-7 items-center justify-center rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 transition cursor-pointer"
+                  title="Remove"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
+          </div>
+
           <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
             <Button
               type="button"
@@ -352,7 +582,7 @@ function ComplaintCard({ complaint, currentUser, userRole, onStatusUpdate, onDel
             </Button>
             <button
               type="submit"
-              disabled={submitting}
+              disabled={submitting || compressingImg}
               className={`rounded-xl px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition disabled:opacity-50 cursor-pointer ${
                 actionModal.status === "resolved"
                   ? "bg-emerald-600 hover:bg-emerald-700"
@@ -367,6 +597,33 @@ function ComplaintCard({ complaint, currentUser, userRole, onStatusUpdate, onDel
             </button>
           </div>
         </form>
+      </Modal>
+
+      {/* Full Size Image Preview Modal / Lightbox */}
+      <Modal
+        isOpen={previewModal.isOpen}
+        title={previewModal.title || "Image Preview"}
+        onClose={() => setPreviewModal({ isOpen: false, imageUrl: "", title: "" })}
+      >
+        <div className="flex flex-col items-center">
+          <div className="max-h-[70vh] w-full overflow-hidden rounded-xl bg-slate-950 flex items-center justify-center">
+            <img
+              src={previewModal.imageUrl}
+              alt={previewModal.title || "Full size preview"}
+              className="max-h-[70vh] w-auto max-w-full object-contain"
+            />
+          </div>
+          <div className="mt-3 flex w-full justify-between items-center text-xs text-slate-500">
+            <span>{previewModal.title}</span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPreviewModal({ isOpen: false, imageUrl: "", title: "" })}
+            >
+              Close
+            </Button>
+          </div>
+        </div>
       </Modal>
     </>
   );

@@ -44,13 +44,14 @@ export const createComplaintController = asyncHandler(async (req, res) => {
 
 export const updateComplaintStatusController = asyncHandler(async (req, res) => {
   const { societyId, complaintId } = req.params;
-  const { status, resolutionNote } = req.body;
+  const { status, resolutionNote, resolutionImage } = req.body;
 
   const complaint = await updateComplaintStatus({
     societyId,
     complaintId,
     status,
     resolutionNote,
+    resolutionImage,
     userId: req.user.id,
     userRole: req.societyMember.role
   });

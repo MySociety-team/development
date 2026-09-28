@@ -38,6 +38,10 @@ const complaintSchema = new Schema(
       default: "OTHER",
       required: true
     },
+    images: {
+      type: [String],
+      default: []
+    },
     status: {
       type: String,
       enum: {
@@ -50,6 +54,10 @@ const complaintSchema = new Schema(
     resolutionNote: {
       type: String,
       trim: true,
+      default: ""
+    },
+    resolutionImage: {
+      type: String,
       default: ""
     },
     resolvedBy: {
