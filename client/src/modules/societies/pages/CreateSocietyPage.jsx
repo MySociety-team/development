@@ -3,9 +3,9 @@ import { Link, useNavigate } from "react-router";
 
 import AppShell from "../../../components/common/AppShell.jsx";
 import { getApiErrorCode, getApiErrorMessage } from "../../../lib/apiError.js";
-import { useAuth } from "../../auth/hooks/useAuth.js";
 import { getMySubscription } from "../../subscriptions/api/subscription.api.js";
 import { createSociety } from "../api/society.api.js";
+import { parseFlatInput } from "../utils/flatParser.js";
 
 const APPROVED_FACILITIES = [
   "GYM",
@@ -51,12 +51,8 @@ const parseCommaSeparated = (value) => {
 
 function CreateSocietyPage() {
   const navigate = useNavigate();
-  const { user } = useAuth();
 
-  const [form, setForm] = useState({
-    ...INITIAL_FORM,
-    mobileNumber: user?.mobileNumber ?? ""
-  });
+  const [form, setForm] = useState(INITIAL_FORM);
   const [facilities, setFacilities] = useState([]);
   const [subscription, setSubscription] = useState(null);
   const [checkingSubscription, setCheckingSubscription] = useState(true);
@@ -94,10 +90,21 @@ function CreateSocietyPage() {
   const handleChange = (event) => {
     const { name, value } = event.target;
 
-    setForm((current) => ({
-      ...current,
-      [name]: value
-    }));
+    if (name === "flatNumber") {
+      const parsed = parseFlatInput(value);
+      setForm((current) => ({
+        ...current,
+        flatNumber: value,
+        wing: parsed.wing !== null ? parsed.wing : current.wing,
+        floor: parsed.floor !== null ? parsed.floor : current.floor,
+        addressNote: parsed.addressNote !== null ? parsed.addressNote : current.addressNote
+      }));
+    } else {
+      setForm((current) => ({
+        ...current,
+        [name]: value
+      }));
+    }
 
     setErrorMessage("");
   };
@@ -424,6 +431,9 @@ function CreateSocietyPage() {
                 placeholder="A-101"
                 className="w-full rounded-xl border border-slate-200 bg-slate-50/40 px-3.5 py-3 text-sm text-slate-900 shadow-sm outline-none transition-all duration-200 placeholder:text-slate-400 hover:border-slate-300 focus:border-slate-900 focus:bg-white focus:ring-4 focus:ring-slate-900/5"
               />
+              <p className="mt-1.5 text-[11px] text-slate-400">
+                Auto-detects wing and floor (e.g. A-101)
+              </p>
             </div>
 
             <div>

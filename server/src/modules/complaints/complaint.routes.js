@@ -1,37 +1,21 @@
 import express from "express";
 
 import authenticate from "../../middleware/authentication.js";
-import { requireSocietyMember, requireSocietyRole } from "../../middleware/societyAuthorization.js";
+import { requireSocietyMember } from "../../middleware/societyAuthorization.js";
 import {
-  getComplaintsController,
   createComplaintController,
-  updateComplaintStatusController,
-  deleteComplaintController
+  deleteComplaintController,
+  getComplaintsController,
+  updateComplaintStatusController
 } from "./complaint.controller.js";
 
-const router = express.Router();
+const router = express.Router({ mergeParams: true });
 
 router.use(authenticate);
 
-// Fetch all complaints for a society
-router.get("/:societyId/complaints", requireSocietyMember, getComplaintsController);
-
-// Lodge a new complaint
-router.post("/:societyId/complaints", requireSocietyMember, createComplaintController);
-
-// Update complaint status (Secretary only)
-router.patch(
-  "/:societyId/complaints/:complaintId/status",
-  requireSocietyMember,
-  requireSocietyRole("SECRETARY"),
-  updateComplaintStatusController
-);
-
-// Delete a complaint
-router.delete(
-  "/:societyId/complaints/:complaintId",
-  requireSocietyMember,
-  deleteComplaintController
-);
+router.get("/", requireSocietyMember, getComplaintsController);
+router.post("/", requireSocietyMember, createComplaintController);
+router.patch("/:complaintId/status", requireSocietyMember, updateComplaintStatusController);
+router.delete("/:complaintId", requireSocietyMember, deleteComplaintController);
 
 export default router;

@@ -5,6 +5,7 @@ import AppShell from "../../../components/common/AppShell.jsx";
 import { getApiErrorMessage } from "../../../lib/apiError.js";
 import { getMySubscription } from "../../subscriptions/api/subscription.api.js";
 import { getMySocieties } from "../api/society.api.js";
+import SocietyNotificationBadge from "../../notifications/components/SocietyNotificationBadge.jsx";
 
 function SocietiesPage() {
   const [societies, setSocieties] = useState([]);
@@ -116,9 +117,12 @@ function SocietiesPage() {
               >
                 <div className="flex items-start justify-between gap-4">
                   <h3 className="font-bold text-slate-900">{society.name}</h3>
-                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
-                    {society.role}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <SocietyNotificationBadge societyId={society.id} />
+                    <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                      {society.role}
+                    </span>
+                  </div>
                 </div>
 
                 <p className="mt-2 line-clamp-2 text-sm text-slate-600">{society.address}</p>

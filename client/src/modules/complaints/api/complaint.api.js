@@ -17,15 +17,17 @@ export const createComplaint = async (societyId, payload) => {
 };
 
 /**
- * Update the status of a complaint
+ * Update the status of a complaint with resolution or rejection note
  */
-export const updateComplaintStatus = async (societyId, complaintId, status, resolutionComment) => {
+export const updateComplaintStatus = async (societyId, complaintId, statusOrPayload, maybeNote) => {
+  const payload =
+    typeof statusOrPayload === "object" && statusOrPayload !== null
+      ? statusOrPayload
+      : { status: statusOrPayload, resolutionNote: maybeNote || "" };
+
   const response = await apiClient.patch(
     `/societies/${societyId}/complaints/${complaintId}/status`,
-    {
-      status,
-      resolutionComment
-    }
+    payload
   );
   return response.data.data.complaint;
 };

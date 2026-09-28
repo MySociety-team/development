@@ -4,6 +4,7 @@ function Button({
   disabled = false,
   loading = false,
   variant = "primary",
+  onClick,
   className = "",
   ...props
 }) {
@@ -22,13 +23,14 @@ function Button({
   return (
     <button
       type={type}
-      className={`${baseClasses} ${variants[variant]} ${className}`}
+      onClick={onClick}
+      className={`${baseClasses} ${variants[variant] || variants.primary} ${className}`}
       disabled={disabled || loading}
       {...props}
     >
       {loading ? (
         <span className="flex items-center gap-1.5">
-          <svg className="animate-spin h-4 w-4 text-current" viewBox="0 0 24 24" fill="none">
+          <svg className="h-4 w-4 animate-spin text-current" viewBox="0 0 24 24" fill="none">
             <circle
               className="opacity-25"
               cx="12"
