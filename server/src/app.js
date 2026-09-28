@@ -1,3 +1,15 @@
+import dotenv from "dotenv";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+dotenv.config({
+  path: path.resolve(__dirname, "../.env"),
+  override: true
+});
+
 import compression from "compression";
 import cookieParser from "cookie-parser";
 import cors from "cors";
@@ -18,6 +30,7 @@ import complaintRoutes from "./modules/complaints/complaint.routes.js";
 import announcementRoutes from "./modules/announcements/announcement.routes.js";
 import maintenanceRoutes from "./modules/maintenance/maintenance.routes.js";
 import financeRoutes from "./modules/finance/finance.routes.js";
+import specialCollectionRoutes from "./modules/specialCollections/specialCollection.routes.js";
 
 import apiRouter from "./routes/index.js";
 
@@ -66,6 +79,8 @@ app.use("/api/v1/notifications", notificationRoutes);
 app.use("/api/v1/societies", maintenanceRoutes);
 
 app.use("/api/v1/societies", financeRoutes);
+
+app.use("/api/v1/societies", specialCollectionRoutes);
 
 app.use(notFound);
 

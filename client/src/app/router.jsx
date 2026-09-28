@@ -35,6 +35,13 @@ import EditAnnouncementPage from "../modules/announcements/pages/EditAnnouncemen
 
 import FinancePage from "../modules/finance/pages/FinancePage.jsx";
 
+import SpecialCollectionsPage from "../modules/specialCollections/pages/SpecialCollectionsPage.jsx";
+import CreateSpecialCollectionPage from "../modules/specialCollections/pages/CreateSpecialCollectionPage.jsx";
+import SpecialCollectionDetailsPage from "../modules/specialCollections/pages/SpecialCollectionDetailsPage.jsx";
+import SpecialCollectionPaymentPage from "../modules/specialCollections/pages/SpecialCollectionPaymentPage.jsx";
+import SpecialCollectionPaymentsPage from "../modules/specialCollections/pages/SpecialCollectionPaymentsPage.jsx";
+import EditSpecialCollectionPage from "../modules/specialCollections/pages/EditSpecialCollectionPage.jsx";
+
 import NotFoundPage from "../pages/NotFoundPage.jsx";
 import RouteErrorPage from "../pages/RouteErrorPage.jsx";
 
@@ -156,6 +163,36 @@ const router = createBrowserRouter([
           {
             path: "/societies/:societyId/announcements/:announcementId/edit",
             element: <EditAnnouncementPage />
+          },
+
+          {
+            path: "/societies/:societyId/special-collections",
+            element: <SpecialCollectionsPage />
+          },
+
+          {
+            path: "/societies/:societyId/special-collections/create",
+            element: <CreateSpecialCollectionPage />
+          },
+
+          {
+            path: "/societies/:societyId/special-collections/:collectionId",
+            element: <SpecialCollectionDetailsPage />
+          },
+
+          {
+            path: "/societies/:societyId/special-collections/:collectionId/pay",
+            element: <SpecialCollectionPaymentPage />
+          },
+
+          {
+            path: "/societies/:societyId/special-collections/:collectionId/payments",
+            element: <SpecialCollectionPaymentsPage />
+          },
+
+          {
+            path: "/societies/:societyId/special-collections/:collectionId/edit",
+            element: <EditSpecialCollectionPage />
           }
         ]
       },

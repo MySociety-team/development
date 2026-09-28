@@ -20,6 +20,14 @@ const requireSocietyMember = asyncHandler(async (req, res, next) => {
     throw new ApiError(403, "SOCIETY_MEMBERSHIP_REQUIRED", "You are not a member of this society");
   }
 
+  console.log("SPECIAL DEBUG MEMBERSHIP:", {
+    id: membership._id,
+    role: membership.role,
+    flatId: membership.flatId,
+    userId: membership.userId,
+    societyId: membership.societyId
+  });
+
   req.societyMember = membership;
 
   next();

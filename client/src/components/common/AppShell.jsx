@@ -59,6 +59,7 @@ function AppShell({ title, description, backTo, children, societyId = null }) {
         {(title || description) && (
           <div className="mb-8">
             {title && <h1 className="text-3xl font-bold tracking-tight text-slate-900">{title}</h1>}
+
             {description && (
               <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">{description}</p>
             )}
